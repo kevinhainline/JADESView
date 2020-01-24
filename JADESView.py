@@ -25,15 +25,14 @@ from PIL import ImageTk, Image
 
 #from JADESView_functions import *
 
-
+# Eventually this, and perhaps the arguments, will be parsed in a separate file. 
 EAZY_files = '/Volumes/KNH_EXTERNAL/December_2019_DataChallenge/EAZY_run_1_13_20/F200W_plots_kron_f80/'
 BEAGLE_files = '/Volumes/KNH_EXTERNAL/December_2019_DataChallenge/BEAGLE_output_1_13_20/F200W_kron_f80/'
 all_filters_file_name = '/Users/knh/Desktop/NIRCam/photometric_redshifts/PhotoZReady/JADES_All_Filters.dat'
 output_flags_file = 'Object_Flags.fits'
 output_notes_file = 'Object_Notes.txt'
-ra_dec_size_value = 2.0
-#decsize_value = 2.0
 
+# Right now, everything is kind of built with this as the size of things
 canvasheight = 1000
 canvaswidth = 2000
 
@@ -42,7 +41,12 @@ eazytext_positionx, eazytext_positiony = 350, 70
 beagle_positionx, beagle_positiony = 1500, 350
 beagletext_positionx, beagletext_positiony = 1300, 70
 
+# The default stretch on the various images
 defaultstretch = 'AsinhStretch'
+
+# The default size of the various images
+ra_dec_size_value = 2.0
+
 
 def resizeimage(image):
 	basewidth = 1000
@@ -55,24 +59,26 @@ def resizeimage(image):
 
 def highz():
 	global current_index
+	global ID_list
 	global highZflag_array
 	
 	highZflag_array[current_index] = 1
-	print "This is a High-Redshift Candidate."
+	current_id = ID_list[current_index]
+	print "Object "+str(current_id)+" is a high-redshift candidate."
 
 def badfit():
 	global current_index
 	global badfitflag_array
 	
 	badfitflag_array[current_index] = 1
-	print "This is a Bad Fit."
+	print "Object "+str(current_id)+" has a bad fit."
 
 def baddata():
 	global current_index
 	global baddataflag_array
 	
 	baddataflag_array[current_index] = 1
-	print "This object has Bad Data."
+	print "Object "+str(current_id)+" object has bad data."
 
 
 def nextobject():
@@ -106,7 +112,7 @@ def nextobject():
 		ID_iterator = len(ID_list)-1
 	
 	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[current_index]
+	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
 	#print id
@@ -152,7 +158,7 @@ def previousobject():
 		ID_iterator = 0
 	
 	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[current_index]
+	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
 	#print id
@@ -326,7 +332,6 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 				norm = ImageNormalize(thumbnail, interval=MinMaxInterval(), stretch=LinearStretch())
 			ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
 							
-			# Keep this handle alive, or else figure will disappear
 			if (i <= 5):
 				fig_x, fig_y = 20+(175*i), 500
 				#Label(root, text=all_images_filter_name[i].split('_')[1], font = "Helvetica 20").place(x=fig_x, y = fig_y)
@@ -337,6 +342,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 				fig_x, fig_y = 20+(175*(i-12)), 900
 				#Label(root, text=all_images_filter_name[i].split('_')[1], font = "Helvetica 20").place(x=fig_x, y = fig_y)
 				
+			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
 			plt.close('all')
 
@@ -529,17 +535,17 @@ if (args.id_number_list):
 
 	ID_list = ID_numbers_to_view
 	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[current_index]
+	current_id = ID_values[current_index]
 
 # Create the notes array
 notes_values = np.array([''], dtype = 'object')
 for x in range(0, number_input_objects-1):
 	notes_values = np.append(notes_values, ['']) 
 
+# Create the flag arrays
 highZflag_array = np.zeros(number_input_objects, dtype = 'int')
 badfitflag_array = np.zeros(number_input_objects, dtype = 'int')
 baddataflag_array = np.zeros(number_input_objects, dtype = 'int')
-#notes_values = np.ndarray(number_input_objects, dtype=object)
 
 # So, now, there are three arrays:
 #   ID_list (which is the list of the ID values that will be viewed)
@@ -590,6 +596,9 @@ fig_photo_objects = np.empty(0, dtype = 'object')
 fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 
 
+# # # # # # # # # # # #
+# Flag Object Buttons
+
 # Create the Bad Fit Flag
 btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
 btn1.config(height = 2, width = 13, fg='red', font=('helvetica', 20))
@@ -606,6 +615,8 @@ btn1.config(height = 2, width = 13, fg='red', font=('helvetica', 20))
 btn1.place(x = 1000, y = 870)
 
 
+# # # # # # # # # # # #
+# Move to New Object Buttons
 
 # Create the Next Object Button
 btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
@@ -621,6 +632,10 @@ btn3.place(x = 750, y = 940)
 btn4 = Button(root, text = 'Quit', bd = '5', command = save_destroy)  
 btn4.config(height = 2, width = 20, fg='grey', font=('helvetica', 20))
 btn4.place(x = 1700, y = 940)
+
+
+# # # # # # # # # # # #
+# Image Stretch Buttons
 
 Label(root, text="Stretch", font = "Helvetica 20").place(x=20, y = 950)
 
