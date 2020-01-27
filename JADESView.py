@@ -19,7 +19,11 @@ from astropy.visualization import (MinMaxInterval, ZScaleInterval, LogStretch, I
 import matplotlib.backends.tkagg as tkagg
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-from Tkinter import *
+#from Tkinter import *
+try:
+    from Tkinter import *
+except ImportError:
+    from tkinter import *
 import PIL
 from PIL import ImageTk, Image
 
@@ -35,7 +39,7 @@ beagle_positionx, beagle_positiony = 1500, 350
 beagletext_positionx, beagletext_positiony = 1300, 70
 
 # The default stretch on the various images
-defaultstretch = 'AsinhStretch'
+defaultstretch = 'LogStretch'
 
 # The default size of the various images
 ra_dec_size_value = 2.0
@@ -146,7 +150,7 @@ def previousobject():
 
 	canvas.delete(item4)
 	canvas.delete(item5)
-	if (ID_iterator >= 0):
+	if (ID_iterator > 0):
 		ID_iterator = ID_iterator-1
 	else:
 		ID_iterator = 0
