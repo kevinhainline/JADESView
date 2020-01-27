@@ -14,7 +14,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 
-from astropy.visualization import (MinMaxInterval, SqrtStretch, ImageNormalize, AsinhStretch, SinhStretch, LinearStretch)
+from astropy.visualization import (MinMaxInterval, ZScaleInterval, LogStretch, ImageNormalize, AsinhStretch, SinhStretch, LinearStretch)
 
 import matplotlib.backends.tkagg as tkagg
 from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -23,14 +23,7 @@ from Tkinter import *
 import PIL
 from PIL import ImageTk, Image
 
-#from JADESView_functions import *
-
-# Eventually this, and perhaps the arguments, will be parsed in a separate file. 
-EAZY_files = '/Volumes/KNH_EXTERNAL/December_2019_DataChallenge/EAZY_run_1_13_20/F200W_plots_kron_f80/'
-BEAGLE_files = '/Volumes/KNH_EXTERNAL/December_2019_DataChallenge/BEAGLE_output_1_13_20/F200W_kron_f80/'
-all_filters_file_name = '/Users/knh/Desktop/NIRCam/photometric_redshifts/PhotoZReady/JADES_All_Filters.dat'
-output_flags_file = 'Object_Flags.fits'
-output_notes_file = 'Object_Notes.txt'
+JADESView_input_file = 'JADESView_input_file.dat'
 
 # Right now, everything is kind of built with this as the size of things
 canvasheight = 1000
@@ -71,6 +64,7 @@ def badfit():
 	global badfitflag_array
 	
 	badfitflag_array[current_index] = 1
+	
 	print "Object "+str(current_id)+" has a bad fit."
 
 def baddata():
@@ -176,28 +170,52 @@ def previousobject():
 
 def gotoobject():
 
+	global ID_iterator
+	global current_index
+	global e2
+	global ID_list
+	global ID_list_indices
 	global photo
 	global new_photo
 	global item4
 	global item5
 	global canvas   
+	global fig_photo_objects
+	global defaultstretch
+
+	global eazy_positionx, eazy_positiony
+	global eazytext_positionx, eazytext_positiony
+	global beagle_positionx, beagle_positiony
+	global beagletext_positionx, beagletext_positiony
+
+	notes_values[current_index] = e2.get()
+	e2.delete(0,END)
 
 	if (e1.get().isdigit() == True):
 		canvas.delete(item4)
 		canvas.delete(item5)
-		id_value = 1
-		id_value = int(e1.get())
-		
+
+		#current_id = int(e1.get())
+		ID_iterator = np.where(ID_list == int(e1.get()))[0][0]
+
+		current_index = ID_list_indices[ID_iterator]
+		current_id = ID_list[ID_iterator]
+		e2.insert(0, notes_values[current_index])
+	
 		#print id
-		image = Image.open(EAZY_files+str(id_value)+"_EAZY_SED.png")
+		image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+		image = cropEAZY(image)
 		photo = resizeimage(image)
-		item4 = canvas.create_image(500, 500, image=photo)
+		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 		
-		new_image = Image.open(BEAGLE_files+str(id_value)+"_BEAGLE_SED.png")
+		new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
 		new_photo = resizeimage(new_image)
-		item5 = canvas.create_image(1500, 500, image=new_photo)
+		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+	
+		fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 	else:
-		print "That's not a number."
+		print "That's not a valid ID number."
+
 
 # This will remove the thumbnails, for future work
 def cropEAZY(img):
@@ -213,20 +231,34 @@ def linearstretch():
 	global canvas   
 	global fig_photo_objects
 	global defaultstretch
+	global btn5
+	global btn6
+	global btn7
 
-	defaultstretch = 'LinearStretch'
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_list_indices[ID_iterator]], ID_list_indices[ID_iterator], defaultstretch)
+	btn5.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+	btn6.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+	btn7.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
 
-def sqrtstretch():
+	defaultstretch = 'LinearStretch'	
+	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
+
+def logstretch():
 	global ID_iterator
 	global ID_list
 	global ID_list_indices
 	global canvas   
 	global fig_photo_objects
 	global defaultstretch
+	global btn5
+	global btn6
+	global btn7
 
-	defaultstretch = 'SqrtStretch'
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_list_indices[ID_iterator]], ID_list_indices[ID_iterator], defaultstretch)
+	btn5.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+	btn6.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+	btn7.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+
+	defaultstretch = 'LogStretch'
+	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
 
 def asinhstretch():
 	global ID_iterator
@@ -235,9 +267,16 @@ def asinhstretch():
 	global canvas   
 	global fig_photo_objects
 	global defaultstretch
+	global btn5
+	global btn6
+	global btn7
+
+	btn5.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+	btn6.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+	btn7.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
 
 	defaultstretch = 'AsinhStretch'
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_list_indices[ID_iterator]], ID_list_indices[ID_iterator], defaultstretch)
+	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
 
 def changeradecsize():
 	global ID_iterator
@@ -250,7 +289,7 @@ def changeradecsize():
 	global e3
 
 	ra_dec_size_value = float(e3.get())
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_list_indices[ID_iterator]], ID_list_indices[ID_iterator], defaultstretch)
+	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
 
 
 def draw_figure(canvas, figure, loc=(0, 0)):
@@ -283,7 +322,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 	global image_all
 	global image_hdu_all
 	global image_wcs_all
-	global image_flux_value_err_cat
+	global image_flux_value_cat
 	global all_images_filter_name
 	global number_images
 	global SNR_values
@@ -301,6 +340,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 	position = SkyCoord(str(objRA)+'d '+str(objDEC)+'d', frame='fk5')
 	size = u.Quantity((ra_dec_size_value, ra_dec_size_value), u.arcsec)
 	
+	fig_photo_objects = np.empty(0, dtype = 'object')
 	for i in range(0, number_images):
 		image = image_all[i].data
 		image_hdu = image_hdu_all[i]
@@ -308,8 +348,8 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 				
 		if (all_images_filter_name[i] == 'HST_F814W'):
 			image_wcs.sip = None
-				
-		if (image_flux_value_err_cat[idx_cat, i] > 0):
+		
+		if (image_flux_value_cat[idx_cat, i] > -9999):
 			# Make the cutout
 			image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
 			
@@ -317,7 +357,9 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			plt.clf()
 			fig = plt.figure(figsize=(1.5,1.5))
 			ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
+			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'black')
 			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'white')
+			ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
 			ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
 			# Set the color map
 			plt.set_cmap('gray')
@@ -325,22 +367,19 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			# Normalize the image using the min-max interval and a square root stretch
 			thumbnail = image_cutout.data
 			if (stretch == 'AsinhStretch'):
-				norm = ImageNormalize(thumbnail, interval=MinMaxInterval(), stretch=AsinhStretch())
-			if (stretch == 'SqrtStretch'):
-				norm = ImageNormalize(thumbnail, interval=MinMaxInterval(), stretch=SqrtStretch())
+				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=AsinhStretch())
+			if (stretch == 'LogStretch'):
+				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LogStretch(100))
 			if (stretch == 'LinearStretch'):
-				norm = ImageNormalize(thumbnail, interval=MinMaxInterval(), stretch=LinearStretch())
+				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LinearStretch())
 			ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
 							
 			if (i <= 5):
 				fig_x, fig_y = 20+(175*i), 500
-				#Label(root, text=all_images_filter_name[i].split('_')[1], font = "Helvetica 20").place(x=fig_x, y = fig_y)
 			if ((i > 5) & (i <= 11)):
 				fig_x, fig_y = 20+(175*(i-6)), 675
-				#Label(root, text=all_images_filter_name[i].split('_')[1], font = "Helvetica 20").place(x=fig_x, y = fig_y)
 			if ((i > 11) & (i <= 17)):
 				fig_x, fig_y = 20+(175*(i-12)), 900
-				#Label(root, text=all_images_filter_name[i].split('_')[1], font = "Helvetica 20").place(x=fig_x, y = fig_y)
 				
 			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
@@ -395,54 +434,31 @@ def save_destroy():
 			w.write(str(ID_values[z])+'    '+str(notes_values[z])+'\n')
 	w.close()
 
-	#print notes_values
 	quit()
 	#root.destroy()
 
 
-######################
-# Required Arguments #
-######################
 
 parser = argparse.ArgumentParser()
-
-# Input Photometry
-parser.add_argument(
-  '-input','--input_photometry',
-  help="Input Photometry for analysis",
-  action="store",
-  type=str,
-  dest="input_photometry",
-  required=True
-)
-
-# Filters file
-parser.add_argument(
-  '-filters','--filters',
-  help="Input file with filters that were used",
-  action="store",
-  type=str,
-  dest="filters",
-  required=True
-)
-
-# Input image file
-parser.add_argument(
-  '-ilist','--image_list',
-  help="List of input images thumbnails are desired for",
-  action="store",
-  type=str,
-  dest="image_list",
-  required=False
-)
 
 ######################
 # Optional Arguments #
 ######################
 
+# JADESView Input File
+parser.add_argument(
+  '-input',
+  help="JADESView Input File?",
+  action="store",
+  type=str,
+  dest="input",
+  required=False
+)
+
+
 # ID number
 parser.add_argument(
-  '-id','--id_number',
+  '-id',
   help="ID Number?",
   action="store",
   type=int,
@@ -450,10 +466,9 @@ parser.add_argument(
   required=False
 )
 
-
 # ID list
 parser.add_argument(
-  '-idlist','--id_number_list',
+  '-idlist',
   help="List of ID Numbers?",
   action="store",
   type=str,
@@ -463,11 +478,39 @@ parser.add_argument(
 
 args=parser.parse_args()
 
+if (args.input):
+	JADESView_input_file = args.input
+
+# Read in the various input values from the input file. 
+input_lines = np.loadtxt(JADESView_input_file, dtype='str')
+number_input_lines = len(input_lines[:,0])
+for i in range(0, number_input_lines):
+	if (input_lines[i,0] == 'input_photometry'):
+		input_photometry = input_lines[i,1]
+	if (input_lines[i,0] == 'image_list'):
+		all_images_file_name = input_lines[i,1]
+	if (input_lines[i,0] == 'EAZY_files'):
+		EAZY_files = input_lines[i,1]
+	if (input_lines[i,0] == 'BEAGLE_files'):
+		BEAGLE_files = input_lines[i,1]
+	if (input_lines[i,0] == 'output_flags_file'):
+		output_flags_file = input_lines[i,1]
+	if (input_lines[i,0] == 'output_notes_file'):
+		output_notes_file = input_lines[i,1]
+	if (input_lines[i,0] == 'canvasheight'):
+		canvasheight = float(input_lines[i,1])
+	if (input_lines[i,0] == 'canvaswidth'):
+		canvaswidth = float(input_lines[i,1])
+	if (input_lines[i,0] == 'defaultstretch'):
+		defaultstretch = input_lines[i,1]
+	if (input_lines[i,0] == 'ra_dec_size_value'):
+		ra_dec_size_value = float(input_lines[i,1])
+	
+
 # # # # # # # # # # # # # # # # # # 
 # Let's open up all the input files
 
 # Open up the image list file
-all_images_file_name = args.image_list
 images_all_txt = np.loadtxt(all_images_file_name, dtype='str')
 all_images_filter_name = images_all_txt[:,0]
 all_image_paths = images_all_txt[:,1]
@@ -485,7 +528,7 @@ for i in range(0, number_images):
 
 
 # Open up the photometric catalog
-fitsinput = fits.open(args.input_photometry)
+fitsinput = fits.open(input_photometry)
 ID_values = fitsinput[1].data['ID']
 RA_values = fitsinput[1].data['RA']
 DEC_values = fitsinput[1].data['DEC']
@@ -569,10 +612,6 @@ root.wm_title("JADESView")
 # Create the canvas 
 canvas=Canvas(root, height=canvasheight, width=canvaswidth)
 
-#id_iterator = 0
-#id_value = ID_numbers[id_iterator]
-
-
 # Plot the EAZY SED
 image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
 
@@ -601,7 +640,7 @@ fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, cur
 
 # Create the Bad Fit Flag
 btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
-btn1.config(height = 2, width = 13, fg='red', font=('helvetica', 20))
+btn1.config(height = 2, width = 13, fg='black', font=('helvetica', 20))
 btn1.place(x = 600, y = 870)
 
 # Create the High Redshift Flag Button
@@ -611,28 +650,43 @@ btn1.place(x = 800, y = 870)
 
 # Create the Bad Data Flag
 btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
-btn1.config(height = 2, width = 13, fg='red', font=('helvetica', 20))
+btn1.config(height = 2, width = 13, fg='black', font=('helvetica', 20))
 btn1.place(x = 1000, y = 870)
 
 
 # # # # # # # # # # # #
 # Move to New Object Buttons
 
-# Create the Next Object Button
-btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
-btn2.config(height = 2, width = 20, fg='black', font=('helvetica', 20))
-btn2.place(x = 1040, y = 940)
 
 # Create the Previous Object Button
 btn3 = Button(root, text = 'Previous Object', bd = '5', command = previousobject)  
 btn3.config(height = 2, width = 20, fg='black', font=('helvetica', 20))
-btn3.place(x = 750, y = 940)
+btn3.place(x = 600, y = 940)
+
+# Create the Next Object Button
+btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
+btn2.config(height = 2, width = 20, fg='black', font=('helvetica', 20))
+btn2.place(x = 917, y = 940)
+
+if (args.id_number_list is None):
+	# Create the Object Entry Field and Button
+	Label(root, text="Display Object: ", font = "Helvetica 20").place(x=1220, y = 950)
+	e1 = Entry(root, width = 5, font = "Helvetica 20")
+	e1.place(x = 1370, y = 946)
+	
+	btn9 = Button(root, text = 'Go', bd = '5', command = gotoobject)  
+	btn9.config(height = 1, width = 4, fg='blue', font=('helvetica', 20))
+	#btn2.pack(side = 'bottom')
+	btn9.place(x = 1470, y = 949)
+
+
+# # # # # # # # # # # #
+# Quit Buttons
 
 # Create the Quit Button
 btn4 = Button(root, text = 'Quit', bd = '5', command = save_destroy)  
 btn4.config(height = 2, width = 20, fg='grey', font=('helvetica', 20))
 btn4.place(x = 1700, y = 940)
-
 
 # # # # # # # # # # # #
 # Image Stretch Buttons
@@ -641,31 +695,30 @@ Label(root, text="Stretch", font = "Helvetica 20").place(x=20, y = 950)
 
 # Create the LinearStretch Button
 btn5 = Button(root, text = 'Linear', bd = '5', command = linearstretch)  
-btn5.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+if (defaultstretch == 'LinearStretch'):
+	btn5.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+else:
+	btn5.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
 btn5.place(x = 100, y = 940)
 
-# Create the SqrtStretch Button
-btn6 = Button(root, text = 'Sqrt', bd = '5', command = sqrtstretch)  
-btn6.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+# Create the LogStretch Button
+btn6 = Button(root, text = 'Log', bd = '5', command = logstretch)  
+if (defaultstretch == 'LogStretch'):
+	btn6.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+else:
+	btn6.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
 btn6.place(x = 250, y = 940)
 
-# Create the LinearStretch Button
+# Create the Asinh Button
 btn7 = Button(root, text = 'Asinh', bd = '5', command = asinhstretch)  
-btn7.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+if (defaultstretch == 'AsinhStretch'):
+	btn7.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+else:
+	btn7.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
 btn7.place(x = 400, y = 940)
 
 
 
-# Create the Object Entry Field and Button
-#if (args.id_number):
-#	Label(root, text="Display Object: ", font = "Helvetica 20").place(x=30, y = 940)
-#	e1 = Entry(root, width = 5, font = "Helvetica 20")
-#	e1.place(x = 200, y = 940)
-
-#	btn3 = Button(root, text = 'Go', bd = '5', command = gotoobject)  
-#	btn3.config(height = 2, width = 4, fg='blue', font=('helvetica', 20))
-#	#btn2.pack(side = 'bottom')
-#	btn3.place(x = 470, y = 940)
 
 # Create the Notes Field
 Label(root, text="Notes", font = "Helvetica 20").place(x=1220, y = 875)
