@@ -326,7 +326,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 	global image_all
 	global image_hdu_all
 	global image_wcs_all
-	global image_flux_value_cat
+	global image_flux_value_err_cat
 	global all_images_filter_name
 	global number_images
 	global SNR_values
@@ -353,7 +353,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 		if (all_images_filter_name[i] == 'HST_F814W'):
 			image_wcs.sip = None
 		
-		if (image_flux_value_cat[idx_cat, i] > -9999):
+		if (image_flux_value_err_cat[idx_cat, i] > -9999):
 			# Make the cutout
 			image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
 			
