@@ -1,4 +1,5 @@
 import os
+import ast
 import sys
 import math
 import argparse
@@ -56,11 +57,12 @@ def resizeimage(image):
 
 def highz():
 	global current_index
+	global ID_iterator
 	global ID_list
 	global highZflag_array
 	
 	highZflag_array[current_index] = 1
-	current_id = ID_list[current_index]
+	current_id = ID_list[ID_iterator]
 	print "Object "+str(current_id)+" is a high-redshift candidate."
 
 def badfit():
@@ -363,21 +365,46 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
 			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'black')
 			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'white')
-			ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
-			ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
+			if (SNR_values[idx_cat, i] > -100):
+				ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
+				ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
+			else:
+				ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
+				ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
+			
 			# Set the color map
 			plt.set_cmap('gray')
-					
+			
+			indexerror = 0		
 			# Normalize the image using the min-max interval and a square root stretch
 			thumbnail = image_cutout.data
 			if (stretch == 'AsinhStretch'):
-				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=AsinhStretch())
+				try:
+					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=AsinhStretch())
+				except IndexError:
+					indexerror = 1
+				except UnboundLocalError:
+					indexerror = 1
 			if (stretch == 'LogStretch'):
-				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LogStretch(100))
+				try:
+					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LogStretch(100))
+				except IndexError:
+					indexerror = 1
+				except UnboundLocalError:
+					indexerror = 1
 			if (stretch == 'LinearStretch'):
-				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LinearStretch())
-			ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
-							
+				try:
+					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LinearStretch())
+				except IndexError:
+					indexerror = 1
+				except UnboundLocalError:
+					indexerror = 1
+			
+			if (indexerror == 0):
+				ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
+			else:
+				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
+			
 			if (i <= 5):
 				fig_x, fig_y = 20+(175*i), 500
 			if ((i > 5) & (i <= 11)):
@@ -480,6 +507,17 @@ parser.add_argument(
   required=False
 )
 
+# User Depths 
+parser.add_argument(
+  '-idarglist',
+  help="Command line argument list of objects",
+  action="store",
+  type=str,
+  dest="idarglist",
+  required=False
+)
+
+
 args=parser.parse_args()
 
 if (args.input):
@@ -559,6 +597,8 @@ if (args.id_number):
 	ID_iterator = current_index
 	if (args.id_number_list):
 		print "You can't specify an individual ID and a list, ignoring the list."
+	if (args.idarglist):
+		print "You can't specify an individual ID and a list, ignoring the list."
 	
 if not (args.id_number):
 	if not (args.id_number_list):
@@ -567,22 +607,37 @@ if not (args.id_number):
 		current_index = ID_list_indices[ID_iterator]
 		current_id = ID_list[current_index]
 
-if (args.id_number_list):
-	ID_input_file = np.loadtxt(args.id_number_list)
-	if (len(ID_input_file.shape) > 1):
-		ID_numbers_to_view = ID_input_file[:,0].astype(int)
-	else:
-		ID_numbers_to_view = ID_input_file.astype(int)
-	number_id_list = len(ID_numbers_to_view)
+	if (args.id_number_list):
+		ID_input_file = np.loadtxt(args.id_number_list)
+		if (len(ID_input_file.shape) > 1):
+			ID_numbers_to_view = ID_input_file[:,0].astype(int)
+		else:
+			ID_numbers_to_view = ID_input_file.astype(int)
+		number_id_list = len(ID_numbers_to_view)
+	
+		# Set up index array for 
+		ID_list_indices = np.zeros(number_id_list, dtype = int)
+		for x in range(0, number_id_list):
+			ID_list_indices[x] = np.where(ID_values == ID_numbers_to_view[x])[0]
+	
+		ID_list = ID_numbers_to_view
+		current_index = ID_list_indices[ID_iterator]
+		current_id = ID_values[current_index]
 
-	# Set up index array for 
-	ID_list_indices = np.zeros(number_id_list, dtype = int)
-	for x in range(0, number_id_list):
-		ID_list_indices[x] = np.where(ID_values == ID_numbers_to_view[x])[0]
+	if (args.idarglist):
+		ID_numbers_to_view = np.array(ast.literal_eval(args.idarglist))
+	
+		number_id_list = len(ID_numbers_to_view)
+	
+		# Set up index array for 
+		ID_list_indices = np.zeros(number_id_list, dtype = int)
+		for x in range(0, number_id_list):
+			ID_list_indices[x] = np.where(ID_values == ID_numbers_to_view[x])[0]
+	
+		ID_list = ID_numbers_to_view
+		current_index = ID_list_indices[ID_iterator]
+		current_id = ID_values[current_index]
 
-	ID_list = ID_numbers_to_view
-	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_values[current_index]
 
 # Create the notes array
 notes_values = np.array([''], dtype = 'object')
