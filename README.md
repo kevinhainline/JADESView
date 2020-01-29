@@ -1,5 +1,20 @@
 # JADESView
 
+```
+% python JADESView.py -h
+usage: JADESView.py [-h] [-input INPUT] [-id ID_NUMBER]
+                    [-idlist ID_NUMBER_LIST]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -input INPUT          JADESView Input File?
+  -id ID_NUMBER         ID Number?
+  -idlist ID_NUMBER_LIST
+                        List of ID Numbers?
+  -idarglist IDARGLIST  Command line argument list of objects
+```
+
+
 This tool was designed to allow users to look at EAZY and BEAGLE fits alongside
 thumbnails for for objects from JADES photometric catalogs. The user should start by
 downloading the photometric catalogs and the EAZY and BEAGLE plots from this website:
@@ -58,21 +73,17 @@ stretch on the thumbnails with the `defaultstretch` entry (current options are: 
 is given by `ra_dec_size_value.` Both the stretch and the thumbnail size can be changed 
 within the program on the fly. 
 
-The program is run by specifying an ID or an ID list (if neither are provided, it will start
-at object 1) using these command-line arguments:
+The program is run by specifying an ID, an ID list (as a text file), or an ID list on the
+command line:
 
 ```
-% python JADESView.py -h
-usage: JADESView.py [-h] [-input INPUT] [-id ID_NUMBER]
-                    [-idlist ID_NUMBER_LIST]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -input INPUT          JADESView Input File?
-  -id ID_NUMBER         ID Number?
-  -idlist ID_NUMBER_LIST
-                        List of ID Numbers?
+python JADESView.py -id 1234
+python JADESView.py -idlist list-of-IDs.dat
+python JADESView.py -idarglist '5 6 7 8 9 10' 
 ```
+
+If no IDs are provided, the code will start at object 1. 
+
 
 Also, the user can specify a different input file using the `-input` flag, otherwise
 it will default to looking for the file `JADESView_input_file.dat.`
