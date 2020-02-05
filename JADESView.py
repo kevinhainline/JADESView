@@ -727,7 +727,7 @@ btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
 btn2.config(height = 2, width = 20, fg='black', font=('helvetica', 20))
 btn2.place(x = 917, y = 940)
 
-if (args.id_number_list is None):
+if ((args.id_number_list is None) & (args.idarglist is None)):
 	# Create the Object Entry Field and Button
 	Label(root, text="Display Object: ", font = "Helvetica 20").place(x=1220, y = 950)
 	e1 = Entry(root, width = 5, font = "Helvetica 20")
