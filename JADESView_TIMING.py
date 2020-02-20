@@ -306,17 +306,23 @@ def draw_figure(canvas, figure, loc=(0, 0)):
     loc: location of top-left corner of figure on canvas in pixels.
     Inspired by matplotlib source: lib/matplotlib/backends/backend_tkagg.py
     """
+    new_start_time = time.time()
     figure_canvas_agg = FigureCanvasAgg(figure)
     figure_canvas_agg.draw()
     figure_x, figure_y, figure_w, figure_h = figure.bbox.bounds
     figure_w, figure_h = int(figure_w), int(figure_h)
     photo = PhotoImage(master=canvas, width=figure_w, height=figure_h)
+    print "      Running PhotoImage took %s seconds" % (time.time() - new_start_time)
 
+    new_start_time = time.time()
     # Position: convert from top-left anchor to center anchor
     canvas.create_image(loc[0] + figure_w/2, loc[1] + figure_h/2, image=photo)
+    print "       Running Canvas Create Image took %s seconds" % (time.time() - new_start_time)
 
+    new_start_time = time.time()
     # Unfortunately, there's no accessor for the pointer to the native renderer
     tkagg.blit(photo, figure_canvas_agg.get_renderer()._renderer, colormode=2)
+    print "        Running tkagg.blit took %s seconds" % (time.time() - new_start_time)
 
     # Return a handle which contains a reference to the photo object
     # which must be kept live or else the picture disappears
@@ -351,7 +357,6 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 	fig_photo_objects = np.empty(0, dtype = 'object')
 	start_time_full = time.time()
 	for i in range(0, number_images):
-		
 		
 		image = image_all[i].data
 		image_hdu = image_hdu_all[i]
@@ -430,7 +435,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
 			plt.close('all')
-			print "       Drawing the thumnails to the figures took %s seconds" % (time.time() - start_time)
+			print "         Drawing the thumnails to the figures took %s seconds" % (time.time() - start_time)
 	print "**** FULLY PLOTTING THUMBNAILS TOOK %s seconds" % (time.time() - start_time_full)
 
 	return fig_photo_objects
