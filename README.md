@@ -36,7 +36,6 @@ EAZY_files             /Path/to/EAZY_output_plots/
 BEAGLE_files           /Path/to/BEAGLE_output_plots/
 output_flags_file      Object_Flags.fits
 output_notes_file      Object_Notes.txt
-canvasheight           1000
 canvaswidth            2000
 defaultstretch         AsinhStretch
 ra_dec_size_value      2.0
@@ -58,7 +57,9 @@ NRC_F444W /Path/to/Mosaic/File/F444W.fits
 ```
 etc etc. This allows the program to find the individual mosaic images for the thumbnails. 
 The `EAZY_files` and `BEAGLE_files` point to the folders that contain the EAZY and BEAGLE
-output plots from the above linked repository. 
+output plots from the above linked repository. Note that the current version will allow
+the user to change the canvaswidth (default: 2000 pixels), and hopefully everything will 
+scale so that you can use the code on smaller monitors. 
 
 The program will produce output files that may be useful. The first is a fits file with 
 objects flagged (currently there are three flags, bad data, bad fit, and high-redshift object,
@@ -97,7 +98,10 @@ to the previous object (if using a list of targets, this will move along the lis
 it will advance numerically to the next or previous object). If the user has not specified
 a list of targets, there will also be an option to go to any object with a given ID. 
 Finally, there's a field for writing notes, which will be saved until the program is 
-quit, after which the notes will be written to a file. 
+quit, after which the notes will be written to a file. In addition, the user can save the
+contents of the canvas (the EAZY, BEAGLE fits, and thumbnails only, not the buttons)
+to an image file ('XXXX_JADESView.png' where XXXX is the Object ID) with the Save Canvas 
+button. 
 
 Note: The program will overwrite the output files if they are not renamed between runs. 
 
