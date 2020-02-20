@@ -33,15 +33,16 @@ JADESView_input_file = 'JADESView_input_file.dat'
 
 # Right now, the default canvaswidth is 2000. 
 canvaswidth = 2000
-sf = canvaswidth / 2000.0
+sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canvas
+                          # element positions and sizes are shrunk or expanded. I 
+                          # RECOGNIZE THAT I SHOULD PUT THINGS ON A GRID, BUT THAT
+                          # WILL COME IN A FUTURE UPDATE, OK
 
-canvasheight = canvaswidth/2.0#1000
+canvasheight = canvaswidth/2.0  # I lock everything to a 2x1 aspect ratio
 baseplotwidth = int(1000*sf)
 textsizevalue = int(20*sf)
 
 thumbnailsize = 1.5*sf
-
-print canvaswidth, canvasheight
 
 eazy_positionx, eazy_positiony = 500*sf, 230*sf
 eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
@@ -240,6 +241,8 @@ def cropEAZY(img):
 	return output_image
 
 def linearstretch():
+	global sf
+	global textsizevalue
 	global ID_iterator
 	global ID_list
 	global ID_list_indices
@@ -250,14 +253,16 @@ def linearstretch():
 	global btn6
 	global btn7
 
-	btn5.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
-	btn6.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
-	btn7.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
 
 	defaultstretch = 'LinearStretch'	
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
 
 def logstretch():
+	global sf
+	global textsizevalue
 	global ID_iterator
 	global ID_list
 	global ID_list_indices
@@ -268,14 +273,16 @@ def logstretch():
 	global btn6
 	global btn7
 
-	btn5.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
-	btn6.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
-	btn7.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
 
 	defaultstretch = 'LogStretch'
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
 
 def asinhstretch():
+	global sf
+	global textsizevalue
 	global ID_iterator
 	global ID_list
 	global ID_list_indices
@@ -286,12 +293,43 @@ def asinhstretch():
 	global btn6
 	global btn7
 
-	btn5.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
-	btn6.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
-	btn7.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
 
 	defaultstretch = 'AsinhStretch'
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
+
+# This is kind of a hack to make sure that the image thumbnail size is printed on
+# the output files, since none of the labels or buttons are printed when you use
+# canvas.postscript()
+def save_canvas():
+	global thumbnailsize
+	global sf
+	global canvas
+	global ID_list
+	global ID_iterator
+	global e3
+
+	ra_dec_size_value = float(e3.get())
+
+	fig = plt.figure(figsize=(thumbnailsize*2.0,thumbnailsize/4.0))
+	ax8 = fig.add_axes([0, 0, 1, 1])
+	ax8.text(0.1, 0.5, "Image Size: "+str(ra_dec_size_value)+"\" x "+str(ra_dec_size_value)+"\"", transform=ax8.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
+
+	fig_x = 20*sf
+	fig_y = 900*sf
+	fig_size_object = draw_figure(canvas, fig, loc=(fig_x, fig_y))
+
+	current_id = ID_list[ID_iterator]
+
+	output_filename = str(current_id)+'_JADESView'
+	canvas.postscript(file=output_filename+'.eps', colormode='color')
+	# use PIL to convert to PNG 
+	img = Image.open(output_filename+'.eps') 
+	os.system('rm '+output_filename+'.eps')
+	img.save(output_filename+'.png', 'png') 
+
 
 def changeradecsize():
 	global ID_iterator
@@ -573,7 +611,7 @@ image_all = np.empty(0)
 image_hdu_all = np.empty(0)
 image_wcs_all = np.empty(0)
 for i in range(0, number_images):
-	print "Opening up image: "+all_image_paths[i]
+	#print "Opening up image: "+all_image_paths[i]
 	image_all = np.append(image_all, fits.open(all_image_paths[i]))
 	image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[0])
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
@@ -710,17 +748,17 @@ fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, cur
 
 # Create the Bad Fit Flag
 btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
-btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue))
+btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
 btn1.place(x = 600*sf, y = 870*sf)
 
 # Create the High Redshift Flag Button
 btn1 = Button(root, text = 'High Redshift', bd = '5', command = highz)
-btn1.config(height = int(2*sf), width = int(13*sf), fg='red', font=('helvetica', textsizevalue))
-btn1.place(x = 800*sf, y = 870*sf)
+btn1.config(height = int(2*sf), width = int(13*sf), fg='red', font=('helvetica', textsizevalue), padx = 20, pady = 3)
+btn1.place(x = 785*sf, y = 870*sf)
 
 # Create the Bad Data Flag
 btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
-btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue))
+btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
 btn1.place(x = 1000*sf, y = 870*sf)
 
 
@@ -730,12 +768,12 @@ btn1.place(x = 1000*sf, y = 870*sf)
 
 # Create the Previous Object Button
 btn3 = Button(root, text = 'Previous Object', bd = '5', command = previousobject)  
-btn3.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue))
+btn3.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
 btn3.place(x = 600*sf, y = 940*sf)
 
 # Create the Next Object Button
 btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
-btn2.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue))
+btn2.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
 btn2.place(x = 917*sf, y = 940*sf)
 
 if ((args.id_number_list is None) & (args.idarglist is None)):
@@ -751,12 +789,19 @@ if ((args.id_number_list is None) & (args.idarglist is None)):
 
 
 # # # # # # # # # # # #
-# Quit Buttons
+# Quit Button
 
-# Create the Quit Button
 btn4 = Button(root, text = 'Quit', bd = '5', command = save_destroy)  
-btn4.config(height = int(2*sf), width = int(20*sf), fg='grey', font=('helvetica', textsizevalue))
-btn4.place(x = 1700*sf, y = 940*sf)
+btn4.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+btn4.place(x = 1850*sf, y = 940*sf)
+
+# # # # # # # # # # # #
+# Save Canvas Button
+
+btn4 = Button(root, text = 'Save Canvas', bd = '5', command = save_canvas)  
+btn4.config(height = int(2*sf), width = int(15*sf), fg='grey', font=('helvetica', textsizevalue))
+btn4.place(x = 1650*sf, y = 940*sf)
+
 
 # # # # # # # # # # # #
 # Image Stretch Buttons
@@ -805,7 +850,6 @@ Label(root, text="arcseconds", font=('helvetica', textsizevalue)).place(x=280*sf
 btn8 = Button(root, text = 'Change', bd = '5', command = changeradecsize)  
 btn8.config(height = 1, width = int(10*sf), fg='blue', font=('helvetica', textsizevalue))
 btn8.place(x = 400*sf, y = 885*sf)
-
 
 
 root.mainloop()
