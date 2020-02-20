@@ -73,7 +73,7 @@ def highz():
 	
 	highZflag_array[current_index] = 1
 	current_id = ID_list[ID_iterator]
-	print "Object "+str(current_id)+" is a high-redshift candidate."
+	print("Object "+str(current_id)+" is a high-redshift candidate.")
 
 def badfit():
 	global current_index
@@ -81,18 +81,17 @@ def badfit():
 	
 	badfitflag_array[current_index] = 1
 	
-	print "Object "+str(current_id)+" has a bad fit."
+	print("Object "+str(current_id)+" has a bad fit.")
 
 def baddata():
 	global current_index
 	global baddataflag_array
 	
 	baddataflag_array[current_index] = 1
-	print "Object "+str(current_id)+" object has bad data."
+	print("Object "+str(current_id)+" object has bad data.")
 
 
 def nextobject():
-	#print "Moving to the next object."
 	global e2
 	global ID_iterator
 	global current_index
@@ -125,7 +124,6 @@ def nextobject():
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	#print id
 	image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
 	image = cropEAZY(image)
 	photo = resizeimage(image)
@@ -138,7 +136,6 @@ def nextobject():
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 
 def previousobject():
-	#print "Moving to the next object."
 	global ID_iterator
 	global current_index
 	global e2
@@ -171,7 +168,6 @@ def previousobject():
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	#print id
 	image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
 	image = cropEAZY(image)
 	photo = resizeimage(image)
@@ -218,7 +214,6 @@ def gotoobject():
 		current_id = ID_list[ID_iterator]
 		e2.insert(0, notes_values[current_index])
 	
-		#print id
 		image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
 		image = cropEAZY(image)
 		photo = resizeimage(image)
@@ -230,7 +225,7 @@ def gotoobject():
 	
 		fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 	else:
-		print "That's not a valid ID number."
+		print("That's not a valid ID number.")
 
 
 # This will remove the thumbnails, for future work
@@ -619,7 +614,7 @@ for i in range(0, number_images):
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)
-ID_values = fitsinput[1].data['ID']
+ID_values = fitsinput[1].data['ID'].astype('int')
 RA_values = fitsinput[1].data['RA']
 DEC_values = fitsinput[1].data['DEC']
 number_objects = len(ID_values)
@@ -639,19 +634,19 @@ ID_iterator = 0
 # Decide whether or not the user requested an ID number or an id number list
 if (args.id_number):
 	ID_list = ID_values
-	ID_list_indices = ID_values - 1
+	ID_list_indices = np.arange(len(ID_values), dtype = int)
 	current_id = int(args.id_number)
 	current_index = np.where(ID_values == current_id)[0][0]
 	ID_iterator = current_index
 	if (args.id_number_list):
-		print "You can't specify an individual ID and a list, ignoring the list."
+		print("You can't specify an individual ID and a list, ignoring the list.")
 	if (args.idarglist):
-		print "You can't specify an individual ID and a list, ignoring the list."
+		print("You can't specify an individual ID and a list, ignoring the list.")
 	
 if not (args.id_number):
 	if not (args.id_number_list):
 		ID_list = ID_values
-		ID_list_indices = ID_values - 1
+		ID_list_indices = np.arange(len(ID_values), dtype = int)
 		current_index = ID_list_indices[ID_iterator]
 		current_id = ID_list[current_index]
 
@@ -716,7 +711,6 @@ baddataflag_array = np.zeros(number_input_objects, dtype = 'int')
 root=Tk()
 root.wm_title("JADESView")
 
-#print canvasheight, canvaswidth
 # Create the canvas 
 canvas=Canvas(root, height=canvasheight, width=canvaswidth)
 
