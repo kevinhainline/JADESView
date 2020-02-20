@@ -5,6 +5,7 @@ import math
 import argparse
 import numpy as np
 import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.io import ascii
@@ -30,14 +31,22 @@ from PIL import ImageTk, Image
 
 JADESView_input_file = 'JADESView_input_file.dat'
 
-# Right now, everything is kind of built with this as the size of things
-canvasheight = 1000
+# Right now, the default canvaswidth is 2000. 
 canvaswidth = 2000
+sf = canvaswidth / 2000.0
 
-eazy_positionx, eazy_positiony = 500, 230
-eazytext_positionx, eazytext_positiony = 350, 70
-beagle_positionx, beagle_positiony = 1500, 350
-beagletext_positionx, beagletext_positiony = 1300, 70
+canvasheight = canvaswidth/2.0#1000
+baseplotwidth = int(1000*sf)
+textsizevalue = int(20*sf)
+
+thumbnailsize = 1.5*sf
+
+print canvaswidth, canvasheight
+
+eazy_positionx, eazy_positiony = 500*sf, 230*sf
+eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
+beagle_positionx, beagle_positiony = 1500*sf, 350*sf
+beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
 
 # The default stretch on the various images
 defaultstretch = 'LogStretch'
@@ -47,10 +56,10 @@ ra_dec_size_value = 2.0
 
 
 def resizeimage(image):
-	basewidth = 1000
-	wpercent = (basewidth / float(image.size[0]))
+	global baseplotwidth
+	wpercent = (baseplotwidth / float(image.size[0]))
 	hsize = int((float(image.size[1]) * float(wpercent)))
-	image = image.resize((basewidth, hsize), PIL.Image.ANTIALIAS)
+	image = image.resize((baseplotwidth, hsize), PIL.Image.ANTIALIAS)
 	photo = ImageTk.PhotoImage(image)
 	return photo
 	
@@ -322,6 +331,7 @@ def draw_figure(canvas, figure, loc=(0, 0)):
 
 def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stretch):
 	#global ID_values
+	global thumbnailsize
 	global RA_values
 	global DEC_values
 	global ra_dec_size_value
@@ -361,7 +371,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			
 			# Create the wcs axes
 			plt.clf()
-			fig = plt.figure(figsize=(1.5,1.5))
+			fig = plt.figure(figsize=(thumbnailsize,thumbnailsize))
 			ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
 			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'black')
 			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'white')
@@ -406,11 +416,11 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
 			
 			if (i <= 5):
-				fig_x, fig_y = 20+(175*i), 500
+				fig_x, fig_y = (20*sf)+(175*i*sf), 500*sf
 			if ((i > 5) & (i <= 11)):
-				fig_x, fig_y = 20+(175*(i-6)), 675
+				fig_x, fig_y = (20*sf)+(175*(i-6)*sf), 675*sf
 			if ((i > 11) & (i <= 17)):
-				fig_x, fig_y = 20+(175*(i-12)), 900
+				fig_x, fig_y = (20*sf)+(175*(i-12)*sf), 900*sf
 				
 			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
@@ -539,8 +549,8 @@ for i in range(0, number_input_lines):
 		output_flags_file = input_lines[i,1]
 	if (input_lines[i,0] == 'output_notes_file'):
 		output_notes_file = input_lines[i,1]
-	if (input_lines[i,0] == 'canvasheight'):
-		canvasheight = float(input_lines[i,1])
+#	if (input_lines[i,0] == 'canvasheight'):
+#		canvasheight = float(input_lines[i,1])
 	if (input_lines[i,0] == 'canvaswidth'):
 		canvaswidth = float(input_lines[i,1])
 	if (input_lines[i,0] == 'defaultstretch'):
@@ -668,6 +678,7 @@ baddataflag_array = np.zeros(number_input_objects, dtype = 'int')
 root=Tk()
 root.wm_title("JADESView")
 
+#print canvasheight, canvaswidth
 # Create the canvas 
 canvas=Canvas(root, height=canvasheight, width=canvaswidth)
 
@@ -679,13 +690,13 @@ image = cropEAZY(image)
 
 photo = resizeimage(image)
 item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-Label(root, text="EAZY FIT", font = "Helvetica 30").place(x=eazytext_positionx, y = eazytext_positiony)
+Label(root, text="EAZY FIT", font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
 
 # Plot the BEAGLE SED
 new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
 new_photo = resizeimage(new_image)
 item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-Label(root, text="BEAGLE FIT", font = "Helvetica 30").place(x=beagletext_positionx, y = beagletext_positiony)
+Label(root, text="BEAGLE FIT", font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
 	
 canvas.pack(side = TOP, expand=True, fill=BOTH)
 
@@ -699,18 +710,18 @@ fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, cur
 
 # Create the Bad Fit Flag
 btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
-btn1.config(height = 2, width = 13, fg='black', font=('helvetica', 20))
-btn1.place(x = 600, y = 870)
+btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue))
+btn1.place(x = 600*sf, y = 870*sf)
 
 # Create the High Redshift Flag Button
 btn1 = Button(root, text = 'High Redshift', bd = '5', command = highz)
-btn1.config(height = 2, width = 13, fg='red', font=('helvetica', 20))
-btn1.place(x = 800, y = 870)
+btn1.config(height = int(2*sf), width = int(13*sf), fg='red', font=('helvetica', textsizevalue))
+btn1.place(x = 800*sf, y = 870*sf)
 
 # Create the Bad Data Flag
 btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
-btn1.config(height = 2, width = 13, fg='black', font=('helvetica', 20))
-btn1.place(x = 1000, y = 870)
+btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue))
+btn1.place(x = 1000*sf, y = 870*sf)
 
 
 # # # # # # # # # # # #
@@ -719,24 +730,24 @@ btn1.place(x = 1000, y = 870)
 
 # Create the Previous Object Button
 btn3 = Button(root, text = 'Previous Object', bd = '5', command = previousobject)  
-btn3.config(height = 2, width = 20, fg='black', font=('helvetica', 20))
-btn3.place(x = 600, y = 940)
+btn3.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue))
+btn3.place(x = 600*sf, y = 940*sf)
 
 # Create the Next Object Button
 btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
-btn2.config(height = 2, width = 20, fg='black', font=('helvetica', 20))
-btn2.place(x = 917, y = 940)
+btn2.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue))
+btn2.place(x = 917*sf, y = 940*sf)
 
 if ((args.id_number_list is None) & (args.idarglist is None)):
 	# Create the Object Entry Field and Button
-	Label(root, text="Display Object: ", font = "Helvetica 20").place(x=1220, y = 950)
-	e1 = Entry(root, width = 5, font = "Helvetica 20")
-	e1.place(x = 1370, y = 946)
+	Label(root, text="Display Object: ", font=('helvetica', textsizevalue)).place(x=1220*sf, y = 950*sf)
+	e1 = Entry(root, width = int(5*sf), font=('helvetica', textsizevalue))
+	e1.place(x = 1370*sf, y = 946*sf)
 	
 	btn9 = Button(root, text = 'Go', bd = '5', command = gotoobject)  
-	btn9.config(height = 1, width = 4, fg='blue', font=('helvetica', 20))
+	btn9.config(height = int(1*sf), width = int(4*sf), fg='blue', font=('helvetica', textsizevalue))
 	#btn2.pack(side = 'bottom')
-	btn9.place(x = 1470, y = 949)
+	btn9.place(x = 1470*sf, y = 949*sf)
 
 
 # # # # # # # # # # # #
@@ -744,56 +755,56 @@ if ((args.id_number_list is None) & (args.idarglist is None)):
 
 # Create the Quit Button
 btn4 = Button(root, text = 'Quit', bd = '5', command = save_destroy)  
-btn4.config(height = 2, width = 20, fg='grey', font=('helvetica', 20))
-btn4.place(x = 1700, y = 940)
+btn4.config(height = int(2*sf), width = int(20*sf), fg='grey', font=('helvetica', textsizevalue))
+btn4.place(x = 1700*sf, y = 940*sf)
 
 # # # # # # # # # # # #
 # Image Stretch Buttons
 
-Label(root, text="Stretch", font = "Helvetica 20").place(x=20, y = 950)
+Label(root, text="Stretch", font = ('helvetica', int(20*sf))).place(x=20*sf, y = 950*sf)
 
 # Create the LinearStretch Button
 btn5 = Button(root, text = 'Linear', bd = '5', command = linearstretch)  
 if (defaultstretch == 'LinearStretch'):
-	btn5.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
 else:
-	btn5.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
-btn5.place(x = 100, y = 940)
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+btn5.place(x = 100*sf, y = 940*sf)
 
 # Create the LogStretch Button
 btn6 = Button(root, text = 'Log', bd = '5', command = logstretch)  
 if (defaultstretch == 'LogStretch'):
-	btn6.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
 else:
-	btn6.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
-btn6.place(x = 250, y = 940)
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+btn6.place(x = 250*sf, y = 940*sf)
 
 # Create the Asinh Button
 btn7 = Button(root, text = 'Asinh', bd = '5', command = asinhstretch)  
-if (defaultstretch == 'AsinhStretch'):
-	btn7.config(height = 2, width = 10, fg='black', font=('helvetica', 20))
+if (defaultstretch == 'LinearStretch'):
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='black',font=('helvetica', textsizevalue))
 else:
-	btn7.config(height = 2, width = 10, fg='grey', font=('helvetica', 20))
-btn7.place(x = 400, y = 940)
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+btn7.place(x = 400*sf, y = 940*sf)
 
 
 
 
 # Create the Notes Field
-Label(root, text="Notes", font = "Helvetica 20").place(x=1220, y = 875)
-e2 = Entry(root, width = 50, font = "Helvetica 20")
-e2.place(x = 1300, y = 870)
+Label(root, text="Notes", font = "Helvetica 20").place(x=1220*sf, y = 875*sf)
+e2 = Entry(root, width = int(50*sf), font=('helvetica', textsizevalue))
+e2.place(x = 1300*sf, y = 870*sf)
 e2.insert(0, notes_values[current_index])
 
 # Create the RA and DEC size field 
-Label(root, text="RA/DEC size", font = "Helvetica 20").place(x=20, y = 885)
-e3 = Entry(root, width = 10, font = "Helvetica 20")
-e3.place(x = 150, y = 880)
+Label(root, text="RA/DEC size", font=('helvetica', textsizevalue)).place(x=20*sf, y = 885*sf)
+e3 = Entry(root, width = int(10*sf), font=('helvetica', textsizevalue))
+e3.place(x = 150*sf, y = 880*sf)
 e3.insert(0, str(ra_dec_size_value))
-Label(root, text="arcseconds", font = "Helvetica 20").place(x=280, y = 885)
+Label(root, text="arcseconds", font=('helvetica', textsizevalue)).place(x=280*sf, y = 885*sf)
 btn8 = Button(root, text = 'Change', bd = '5', command = changeradecsize)  
-btn8.config(height = 1, width = 10, fg='blue', font=('helvetica', 20))
-btn8.place(x = 400, y = 885)
+btn8.config(height = 1, width = int(10*sf), fg='blue', font=('helvetica', textsizevalue))
+btn8.place(x = 400*sf, y = 885*sf)
 
 
 
