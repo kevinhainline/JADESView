@@ -295,10 +295,13 @@ def save_canvas():
 	ax8.text(0.1, 0.5, "Image Size: "+str(ra_dec_size_value)+"\" x "+str(ra_dec_size_value)+"\"", transform=ax8.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
 	
 	fig_x = 20*sf
-	if (number_images <= 12):
+	if (number_images <= 6):
+		fig_y = 760*sf
+	if ((number_images > 6) & (number_images <= 12)):
 		fig_y = 900*sf
-	else:
+	if (number_images > 12):
 		fig_y = 1040*sf	
+
 	fig_size_object = draw_figure(canvas, fig, loc=(fig_x, fig_y))
 
 	current_id = ID_list[ID_iterator]
@@ -607,9 +610,11 @@ sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canva
                           # RECOGNIZE THAT I SHOULD PUT THINGS ON A GRID, BUT THAT
                           # WILL COME IN A FUTURE UPDATE, OK
 
-if (number_images <= 12):
+if (number_images <= 6):
+	canvasheight = (canvaswidth*(1.0 / 2.35))  # I lock everything to a 2.35:1 aspect ratio
+if ((number_images > 6) & (number_images <= 12)):
 	canvasheight = (canvaswidth*(1.0 / 2.0))  # I lock everything to a 2:1 aspect ratio
-else:
+if (number_images > 12):
 	canvasheight = (canvaswidth*(1.0 / 1.8))  # I lock everything to a 1.8:1 aspect ratio
 baseplotwidth = int(1000*sf)
 textsizevalue = int(20*sf)
@@ -621,10 +626,13 @@ eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
 beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
 
-if (number_images <= 12):
+if (number_images <= 6):
+	toprow_y = 720
+	bottomrow_y = 790
+if ((number_images > 6) & (number_images <= 12)):
 	toprow_y = 870
 	bottomrow_y = 940
-else:
+if (number_images > 12):
 	toprow_y = 1020
 	bottomrow_y = 1060
 
@@ -818,10 +826,7 @@ btn4.place(x = 1650*sf, y = (bottomrow_y+10.0)*sf)
 # # # # # # # # # # # #
 # Image Stretch Buttons
 
-if (number_images <= 12):
-	Label(root, text="Stretch", font = ('helvetica', int(20*sf))).place(x=20*sf, y = 950*sf)
-else:
-	Label(root, text="Stretch", font = ('helvetica', int(20*sf))).place(x=20*sf, y = 1065*sf)
+Label(root, text="Stretch", font = ('helvetica', int(20*sf))).place(x=20*sf, y = (bottomrow_y+ 10.0)*sf)
 
 # Create the LinearStretch Button
 btn5 = Button(root, text = 'Linear', bd = '5', command = linearstretch)  
