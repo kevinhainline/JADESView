@@ -38,17 +38,6 @@ sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canva
                           # RECOGNIZE THAT I SHOULD PUT THINGS ON A GRID, BUT THAT
                           # WILL COME IN A FUTURE UPDATE, OK
 
-canvasheight = canvaswidth/2.0  # I lock everything to a 2x1 aspect ratio
-baseplotwidth = int(1000*sf)
-textsizevalue = int(20*sf)
-
-thumbnailsize = 1.5*sf
-
-eazy_positionx, eazy_positiony = 500*sf, 230*sf
-eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
-beagle_positionx, beagle_positiony = 1500*sf, 350*sf
-beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
-
 # The default stretch on the various images
 defaultstretch = 'LogStretch'
 
@@ -311,9 +300,12 @@ def save_canvas():
 	fig = plt.figure(figsize=(thumbnailsize*2.0,thumbnailsize/4.0))
 	ax8 = fig.add_axes([0, 0, 1, 1])
 	ax8.text(0.1, 0.5, "Image Size: "+str(ra_dec_size_value)+"\" x "+str(ra_dec_size_value)+"\"", transform=ax8.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
-
+	
 	fig_x = 20*sf
-	fig_y = 900*sf
+	if (number_images <= 12):
+		fig_y = 900*sf
+	else:
+		fig_y = 1040*sf	
 	fig_size_object = draw_figure(canvas, fig, loc=(fig_x, fig_y))
 
 	current_id = ID_list[ID_iterator]
@@ -322,8 +314,9 @@ def save_canvas():
 	canvas.postscript(file=output_filename+'.eps', colormode='color')
 	# use PIL to convert to PNG 
 	img = Image.open(output_filename+'.eps') 
-	os.system('rm '+output_filename+'.eps')
-	img.save(output_filename+'.png', 'png') 
+	#os.system('rm '+output_filename+'.eps')
+	#print output_filename+'.png'
+	#img.save(output_filename+'.png', 'png') 
 
 
 def changeradecsize():
@@ -453,7 +446,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			if ((i > 5) & (i <= 11)):
 				fig_x, fig_y = (20*sf)+(175*(i-6)*sf), 675*sf
 			if ((i > 11) & (i <= 17)):
-				fig_x, fig_y = (20*sf)+(175*(i-12)*sf), 900*sf
+				fig_x, fig_y = (20*sf)+(175*(i-12)*sf), 850*sf
 				
 			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
@@ -611,6 +604,22 @@ for i in range(0, number_images):
 	image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[0])
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 
+# Now that we know how many images we have, let's set the height.
+
+if (number_images <= 12):
+	canvasheight = (canvaswidth*(1.0 / 2.0))  # I lock everything to a 2x1 aspect ratio
+else:
+	canvasheight = (canvaswidth*(3.0 / 4.0))  # I lock everything to a 2x1 aspect ratio
+baseplotwidth = int(1000*sf)
+textsizevalue = int(20*sf)
+
+thumbnailsize = 1.5*sf
+
+eazy_positionx, eazy_positiony = 500*sf, 230*sf
+eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
+beagle_positionx, beagle_positiony = 1500*sf, 350*sf
+beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
+
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)
@@ -743,17 +752,26 @@ fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, cur
 # Create the Bad Fit Flag
 btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
 btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn1.place(x = 600*sf, y = 870*sf)
+if (number_images <= 12):
+	btn1.place(x = 600*sf, y = 870*sf)
+else:
+	btn1.place(x = 600*sf, y = 1020*sf)
 
 # Create the High Redshift Flag Button
 btn1 = Button(root, text = 'High Redshift', bd = '5', command = highz)
 btn1.config(height = int(2*sf), width = int(13*sf), fg='red', font=('helvetica', textsizevalue), padx = 20, pady = 3)
-btn1.place(x = 785*sf, y = 870*sf)
+if (number_images <= 12):
+	btn1.place(x = 785*sf, y = 870*sf)
+else:
+	btn1.place(x = 785*sf, y = 1020*sf)
 
 # Create the Bad Data Flag
 btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
 btn1.config(height = int(2*sf), width = int(13*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn1.place(x = 1000*sf, y = 870*sf)
+if (number_images <= 12):
+	btn1.place(x = 1000*sf, y = 870*sf)
+else:
+	btn1.place(x = 1000*sf, y = 1020*sf)
 
 
 # # # # # # # # # # # #
@@ -763,23 +781,39 @@ btn1.place(x = 1000*sf, y = 870*sf)
 # Create the Previous Object Button
 btn3 = Button(root, text = 'Previous Object', bd = '5', command = previousobject)  
 btn3.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn3.place(x = 600*sf, y = 940*sf)
+if (number_images <= 12):
+	btn3.place(x = 600*sf, y = 940*sf)
+else:
+	btn3.place(x = 600*sf, y = 1060*sf)
+
 
 # Create the Next Object Button
 btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
 btn2.config(height = int(2*sf), width = int(20*sf), fg='black', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn2.place(x = 917*sf, y = 940*sf)
+if (number_images <= 12):
+	btn2.place(x = 917*sf, y = 940*sf)
+else:
+	btn2.place(x = 917*sf, y = 1060*sf)
 
 if ((args.id_number_list is None) & (args.idarglist is None)):
 	# Create the Object Entry Field and Button
-	Label(root, text="Display Object: ", font=('helvetica', textsizevalue)).place(x=1220*sf, y = 950*sf)
+	if (number_images <= 12):
+		Label(root, text="Display Object: ", font=('helvetica', textsizevalue)).place(x=1220*sf, y = 950*sf)
+	else:
+		Label(root, text="Display Object: ", font=('helvetica', textsizevalue)).place(x=1220*sf, y = 1070*sf)
 	e1 = Entry(root, width = int(5*sf), font=('helvetica', textsizevalue))
-	e1.place(x = 1370*sf, y = 946*sf)
+	if (number_images <= 12):
+		e1.place(x = 1370*sf, y = 946*sf)
+	else:
+		e1.place(x = 1370*sf, y = 1066*sf)
 	
 	btn9 = Button(root, text = 'Go', bd = '5', command = gotoobject)  
 	btn9.config(height = int(1*sf), width = int(4*sf), fg='blue', font=('helvetica', textsizevalue))
 	#btn2.pack(side = 'bottom')
-	btn9.place(x = 1470*sf, y = 949*sf)
+	if (number_images <= 12):
+		btn9.place(x = 1470*sf, y = 949*sf)
+	else:
+		btn9.place(x = 1470*sf, y = 1069*sf)
 
 
 # # # # # # # # # # # #
@@ -787,20 +821,29 @@ if ((args.id_number_list is None) & (args.idarglist is None)):
 
 btn4 = Button(root, text = 'Quit', bd = '5', command = save_destroy)  
 btn4.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-btn4.place(x = 1850*sf, y = 940*sf)
+if (number_images <= 12):
+	btn4.place(x = 1850*sf, y = 940*sf)
+else:
+	btn4.place(x = 1850*sf, y = 1060*sf)
 
 # # # # # # # # # # # #
 # Save Canvas Button
 
 btn4 = Button(root, text = 'Save Canvas', bd = '5', command = save_canvas)  
 btn4.config(height = int(2*sf), width = int(15*sf), fg='grey', font=('helvetica', textsizevalue))
-btn4.place(x = 1650*sf, y = 940*sf)
+if (number_images <= 12):
+	btn4.place(x = 1650*sf, y = 940*sf)
+else:
+	btn4.place(x = 1650*sf, y = 1060*sf)
 
 
 # # # # # # # # # # # #
 # Image Stretch Buttons
 
-Label(root, text="Stretch", font = ('helvetica', int(20*sf))).place(x=20*sf, y = 950*sf)
+if (number_images <= 12):
+	Label(root, text="Stretch", font = ('helvetica', int(20*sf))).place(x=20*sf, y = 950*sf)
+else:
+	Label(root, text="Stretch", font = ('helvetica', int(20*sf))).place(x=20*sf, y = 1065*sf)
 
 # Create the LinearStretch Button
 btn5 = Button(root, text = 'Linear', bd = '5', command = linearstretch)  
@@ -808,7 +851,11 @@ if (defaultstretch == 'LinearStretch'):
 	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
 else:
 	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-btn5.place(x = 100*sf, y = 940*sf)
+if (number_images <= 12):
+	btn5.place(x = 100*sf, y = 940*sf)
+else:
+	btn5.place(x = 100*sf, y = 1070*sf)
+
 
 # Create the LogStretch Button
 btn6 = Button(root, text = 'Log', bd = '5', command = logstretch)  
@@ -816,7 +863,11 @@ if (defaultstretch == 'LogStretch'):
 	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
 else:
 	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-btn6.place(x = 250*sf, y = 940*sf)
+if (number_images <= 12):
+	btn6.place(x = 250*sf, y = 940*sf)
+else:
+	btn6.place(x = 250*sf, y = 1070*sf)
+
 
 # Create the Asinh Button
 btn7 = Button(root, text = 'Asinh', bd = '5', command = asinhstretch)  
@@ -824,26 +875,47 @@ if (defaultstretch == 'LinearStretch'):
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='black',font=('helvetica', textsizevalue))
 else:
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-btn7.place(x = 400*sf, y = 940*sf)
+if (number_images <= 12):
+	btn7.place(x = 400*sf, y = 940*sf)
+else:
+	btn7.place(x = 400*sf, y = 1070*sf)
 
 
 
 
 # Create the Notes Field
-Label(root, text="Notes", font = "Helvetica 20").place(x=1220*sf, y = 875*sf)
+if (number_images <= 12):
+	Label(root, text="Notes", font = "Helvetica 20").place(x=1220*sf, y = 875*sf)
+else:
+	Label(root, text="Notes", font = "Helvetica 20").place(x=1220*sf, y = 1005*sf)
 e2 = Entry(root, width = int(50*sf), font=('helvetica', textsizevalue))
-e2.place(x = 1300*sf, y = 870*sf)
+if (number_images <= 12):
+	e2.place(x = 1300*sf, y = 870*sf)
+else:
+	e2.place(x = 1300*sf, y = 1000*sf)
 e2.insert(0, notes_values[current_index])
 
 # Create the RA and DEC size field 
-Label(root, text="RA/DEC size", font=('helvetica', textsizevalue)).place(x=20*sf, y = 885*sf)
+if (number_images <= 12):
+	Label(root, text="RA/DEC size", font=('helvetica', textsizevalue)).place(x=20*sf, y = 885*sf)
+else:
+	Label(root, text="RA/DEC size", font=('helvetica', textsizevalue)).place(x=20*sf, y = 1025*sf)
 e3 = Entry(root, width = int(10*sf), font=('helvetica', textsizevalue))
-e3.place(x = 150*sf, y = 880*sf)
+if (number_images <= 12):
+	e3.place(x = 150*sf, y = 880*sf)
+else:
+	e3.place(x = 150*sf, y = 1020*sf)
 e3.insert(0, str(ra_dec_size_value))
-Label(root, text="arcseconds", font=('helvetica', textsizevalue)).place(x=280*sf, y = 885*sf)
+if (number_images <= 12):
+	Label(root, text="arcseconds", font=('helvetica', textsizevalue)).place(x=280*sf, y = 885*sf)
+else:
+	Label(root, text="arcseconds", font=('helvetica', textsizevalue)).place(x=280*sf, y = 1025*sf)
 btn8 = Button(root, text = 'Change', bd = '5', command = changeradecsize)  
 btn8.config(height = 1, width = int(10*sf), fg='blue', font=('helvetica', textsizevalue))
-btn8.place(x = 400*sf, y = 885*sf)
+if (number_images <= 12):
+	btn8.place(x = 400*sf, y = 885*sf)
+else:
+	btn8.place(x = 400*sf, y = 1025*sf)
 
 
 root.mainloop()
