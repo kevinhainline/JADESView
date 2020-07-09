@@ -397,13 +397,21 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
 			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'black')
 			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'white')
-			if (SNR_values[idx_cat, i] > -100):
-				ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
-				ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
+			if (number_images <= 18):
+				if (SNR_values[idx_cat, i] > -100):
+					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
+				else:
+					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
 			else:
-				ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
-				ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
-			
+				if (SNR_values[idx_cat, i] > -100):
+					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'white')
+				else:
+					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'white')
+						
 			# Set the color map
 			plt.set_cmap('gray')
 			
@@ -437,13 +445,30 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			else:
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
 			
-			if (i <= 5):
-				fig_x, fig_y = (20*sf)+(175*i*sf), 500*sf
-			if ((i > 5) & (i <= 11)):
-				fig_x, fig_y = (20*sf)+(175*(i-6)*sf), 675*sf
-			if ((i > 11) & (i <= 17)):
-				fig_x, fig_y = (20*sf)+(175*(i-12)*sf), 850*sf
-				
+			if (number_images <= 18):
+				if (i <= 5):
+					fig_x, fig_y = (20*sf)+(175*i*sf), 500*sf
+				if ((i > 5) & (i <= 11)):
+					fig_x, fig_y = (20*sf)+(175*(i-6)*sf), 675*sf
+				if ((i > 11) & (i <= 17)):
+					fig_x, fig_y = (20*sf)+(175*(i-12)*sf), 850*sf
+			if ((number_images > 18) & (number_images <= 24)):
+				if (i <= 7):
+					fig_x, fig_y = (20*sf)+(130*i*sf), 500*sf
+				if ((i > 7) & (i <= 15)):
+					fig_x, fig_y = (20*sf)+(130*(i-8)*sf), 675*sf
+				if ((i > 15) & (i <= 23)):
+					fig_x, fig_y = (20*sf)+(130*(i-16)*sf), 850*sf
+			if ((number_images > 24) & (number_images <= 32)):
+				if (i <= 7):
+					fig_x, fig_y = (20*sf)+(130*i*sf), 500*sf
+				if ((i > 7) & (i <= 15)):
+					fig_x, fig_y = (20*sf)+(130*(i-8)*sf), 625*sf
+				if ((i > 15) & (i <= 23)):
+					fig_x, fig_y = (20*sf)+(130*(i-16)*sf), 750*sf
+				if ((i > 23) & (i <= 31)):
+					fig_x, fig_y = (20*sf)+(130*(i-24)*sf), 875*sf
+							
 			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
 			plt.close('all')
@@ -574,8 +599,6 @@ for i in range(0, number_input_lines):
 		output_flags_file = input_lines[i,1]
 	if (input_lines[i,0] == 'output_notes_file'):
 		output_notes_file = input_lines[i,1]
-#	if (input_lines[i,0] == 'canvasheight'):
-#		canvasheight = float(input_lines[i,1])
 	if (input_lines[i,0] == 'canvaswidth'):
 		canvaswidth = float(input_lines[i,1])
 	if (input_lines[i,0] == 'defaultstretch'):
@@ -603,39 +626,45 @@ for i in range(0, number_images):
 	image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[0])
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 
-# Now that we know how many images we have, let's set the height.
 
 sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canvas
                           # element positions and sizes are shrunk or expanded. I 
                           # RECOGNIZE THAT I SHOULD PUT THINGS ON A GRID, BUT THAT
                           # WILL COME IN A FUTURE UPDATE, OK
 
+# We use the number of images we have to to set the canvasheight
 if (number_images <= 6):
 	canvasheight = (canvaswidth*(1.0 / 2.35))  # I lock everything to a 2.35:1 aspect ratio
 if ((number_images > 6) & (number_images <= 12)):
 	canvasheight = (canvaswidth*(1.0 / 2.0))  # I lock everything to a 2:1 aspect ratio
 if (number_images > 12):
 	canvasheight = (canvaswidth*(1.0 / 1.8))  # I lock everything to a 1.8:1 aspect ratio
+
 baseplotwidth = int(1000*sf)
 textsizevalue = int(20*sf)
-
 thumbnailsize = 1.5*sf
 
-eazy_positionx, eazy_positiony = 500*sf, 230*sf
-eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
-beagle_positionx, beagle_positiony = 1500*sf, 350*sf
-beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
-
+# We have a few rows of buttons at the bottom of the canvas, and their exact
+# positions depend on the number of images. 
 if (number_images <= 6):
 	toprow_y = 720
 	bottomrow_y = 790
 if ((number_images > 6) & (number_images <= 12)):
 	toprow_y = 870
 	bottomrow_y = 940
-if (number_images > 12):
+if ((number_images > 12) & (number_images <= 18)):
 	toprow_y = 1020
 	bottomrow_y = 1060
+if ((number_images > 18) & (number_images <= 32)):
+	toprow_y = 1020
+	bottomrow_y = 1060
+	thumbnailsize = 1.2*sf
 
+# These do not change depending on the number of images we have.
+eazy_positionx, eazy_positiony = 500*sf, 230*sf
+eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
+beagle_positionx, beagle_positiony = 1500*sf, 350*sf
+beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)
@@ -853,8 +882,6 @@ if (defaultstretch == 'LinearStretch'):
 else:
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
 btn7.place(x = 400*sf, y = (bottomrow_y+10.0)*sf)
-
-
 
 
 # Create the Notes Field
