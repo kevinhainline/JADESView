@@ -290,7 +290,7 @@ def save_canvas():
 
 	ra_dec_size_value = float(e3.get())
 
-	fig = plt.figure(figsize=(thumbnailsize*2.0,thumbnailsize/4.0))
+	fig = plt.figure(figsize=(thumbnailsize*2.5,thumbnailsize/4.0))
 	ax8 = fig.add_axes([0, 0, 1, 1])
 	ax8.text(0.1, 0.5, "Image Size: "+str(ra_dec_size_value)+"\" x "+str(ra_dec_size_value)+"\"", transform=ax8.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
 	
