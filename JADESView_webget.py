@@ -2,6 +2,10 @@ import os
 import ast
 import sys
 import math
+import time # REMOVE THIS
+import urllib2
+import base64
+import cStringIO
 import argparse
 import numpy as np
 import matplotlib
@@ -37,6 +41,39 @@ defaultstretch = 'LogStretch'
 # The default size of the various images
 ra_dec_size_value = 2.0
 
+def getEAZYimage(ID):
+	
+	start_time = time.time()
+	EAZY_file_name = EAZY_files+str(ID)+'_EAZY_SED.png'
+
+	request = urllib2.Request(EAZY_file_name)
+	#base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
+	request.add_header("Authorization", "Basic %s" % base64string)   
+	result = urllib2.urlopen(request)
+	data = result.read()
+
+	image = Image.open(cStringIO.StringIO(data))
+	end_time = time.time()
+	print("Fetching the EAZY image: " +str(end_time - start_time))
+
+	return image
+
+def getBEAGLEimage(ID):
+
+	start_time = time.time()
+	BEAGLE_file_name = BEAGLE_files+str(ID)+'_BEAGLE_SED.png'
+	
+	request = urllib2.Request(BEAGLE_file_name)
+	#base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
+	request.add_header("Authorization", "Basic %s" % base64string)   
+	result = urllib2.urlopen(request)
+	data = result.read()
+
+	image = Image.open(cStringIO.StringIO(data))
+	end_time = time.time()
+	print("Fetching the BEAGLE image: " +str(end_time - start_time))
+
+	return image
 
 def resizeimage(image):
 	global baseplotwidth
@@ -106,16 +143,36 @@ def nextobject():
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	image = getEAZYimage(current_id)
+	start_time = time.time()
 	image = cropEAZY(image)
+	end_time = time.time()
+	print("Cropping the EAZY image: " +str(end_time - start_time))
+	start_time = time.time()
 	photo = resizeimage(image)
+	end_time = time.time()
+	print("Resizing the EAZY image: " +str(end_time - start_time))
+	start_time = time.time()
 	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
+	end_time = time.time()
+	print("Creating the EAZY canvas: " +str(end_time - start_time))
 	
-	new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	new_image = getBEAGLEimage(current_id)
+	start_time = time.time()
 	new_photo = resizeimage(new_image)
+	end_time = time.time()
+	print("Resizing the BEAGLE image: " +str(end_time - start_time))
+	start_time = time.time()
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+	end_time = time.time()
+	print("Creating the BEAGLE canvas: " +str(end_time - start_time))
 
+	start_time = time.time()
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
+	end_time = time.time()
+	print("Creating the thumbnails: " +str(end_time - start_time))
 
 def previousobject():
 	global ID_iterator
@@ -150,12 +207,14 @@ def previousobject():
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	image = getEAZYimage(current_id)
 	image = cropEAZY(image)
 	photo = resizeimage(image)
 	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 	
-	new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	new_image = getBEAGLEimage(current_id)
 	new_photo = resizeimage(new_image)
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 
@@ -196,12 +255,14 @@ def gotoobject():
 		current_id = ID_list[ID_iterator]
 		e2.insert(0, notes_values[current_index])
 	
-		image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+		#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+		image = getEAZYimage(current_id)
 		image = cropEAZY(image)
 		photo = resizeimage(image)
 		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 		
-		new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+		new_image = getBEAGLEimage(current_id)
 		new_photo = resizeimage(new_image)
 		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 	
@@ -606,7 +667,13 @@ for i in range(0, number_input_lines):
 		defaultstretch = input_lines[i,1]
 	if (input_lines[i,0] == 'ra_dec_size_value'):
 		ra_dec_size_value = float(input_lines[i,1])
-	
+	if (input_lines[i,0] == 'fenrir_username'):
+		fenrir_username = input_lines[i,1]
+	if (input_lines[i,0] == 'fenrir_password'):
+		fenrir_password = input_lines[i,1]
+
+base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
+
 
 # # # # # # # # # # # # # # # # # # 
 # Let's open up all the input files
@@ -772,7 +839,8 @@ root.wm_title("JADESView")
 canvas=Canvas(root, height=canvasheight, width=canvaswidth)
 
 # Plot the EAZY SED
-image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+image = getEAZYimage(current_id)
 
 # Crop out the thumbnails
 image = cropEAZY(image)
@@ -782,7 +850,8 @@ item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 Label(root, text="EAZY FIT", font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
 
 # Plot the BEAGLE SED
-new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+new_image = getBEAGLEimage(current_id)
 new_photo = resizeimage(new_image)
 item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 Label(root, text="BEAGLE FIT", font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
