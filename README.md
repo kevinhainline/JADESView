@@ -21,7 +21,7 @@ downloading the photometric catalogs and the EAZY and BEAGLE plots from this web
 
 [https://fenrir.as.arizona.edu/jades/data/](https://fenrir.as.arizona.edu/jades/data/)
 
-(The log-in details and the catalog descriptions are found [on confluence here](https://issues.cosmos.esa.int/jwst-nirspecwiki/pages/viewpage.action?spaceKey=WGs&title=Step+04+-+Photometric+redshifts+and+derived+information).)
+(The log-in details and the catalog descriptions are found [on confluence here](https://issues.cosmos.esa.int/jwst-nirspecwiki/display/WGs/Step+04+-+Photometric+redshifts+and+derived+information).)
 
 The tool requires numpy, matplotlib, tkinter, and astropy installations, and is written
 using Python 2.7. 
@@ -105,3 +105,29 @@ button.
 
 Note: The program will overwrite the output files if they are not renamed between runs. 
 
+
+## JADESView_webget
+
+`JADESView_webget.py` was designed so that the user does not need to download the full
+set of .png EAZY and BEAGLE output plots. The user is required to use a different input
+file: `JADESView_input_file_webget.dat`:
+
+```
+input_photometry       /Path/to/Photometric_Catalog.fits
+image_list             /Path/to/image_list.dat 
+EAZY_files             http://Path/to/EAZY_output_plots/on/fenrir/
+BEAGLE_files           http://Path/to/BEAGLE_output_plots/on/fenrir/
+output_flags_file      Object_Flags.fits
+output_notes_file      Object_Notes.txt
+canvaswidth            2000
+defaultstretch         AsinhStretch
+ra_dec_size_value      2.0
+fenrir_username        fenrir_username
+fenrir_password        fenrir_password
+``` 
+
+The paths to the EAZY and BEAGLE files on fenrir, as well as the username and password,
+are provided on the confluence page. It is recommended that you have a pretty speedy 
+internet connection, since this will add some time (in my tests, around 1 second per object) 
+for fetching the images from the server instead of on your local machine, but it saves 
+having to download tens of GB of png files.

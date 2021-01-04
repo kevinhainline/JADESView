@@ -451,7 +451,10 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 		
 		if (image_flux_value_err_cat[idx_cat, i] > -9999):
 			# Make the cutout
+			start_time = time.time()
 			image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
+			#end_time = time.time()
+			#print("       Running Cutout2D: " +str(end_time - start_time))
 			
 			# Create the wcs axes
 			plt.clf()
@@ -480,6 +483,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			indexerror = 0		
 			# Normalize the image using the min-max interval and a square root stretch
 			thumbnail = image_cutout.data
+			#start_time = time.time()
 			if (stretch == 'AsinhStretch'):
 				try:
 					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=AsinhStretch())
@@ -501,11 +505,16 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 					indexerror = 1
 				except UnboundLocalError:
 					indexerror = 1
+			#end_time = time.time()
+			#print("       Stretching Image: " +str(end_time - start_time))
 			
+			#start_time = time.time()
 			if (indexerror == 0):
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
 			else:
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
+			#end_time = time.time()
+			#print("       Plotting Thumbnail: " +str(end_time - start_time))
 			
 			if (number_images <= 18):
 				if (i <= 5):
@@ -534,6 +543,8 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
 			plt.close('all')
+			end_time = time.time()
+			print("       Plotting Thumbnail: " +str(end_time - start_time))
 
 	return fig_photo_objects
 
