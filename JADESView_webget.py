@@ -54,7 +54,8 @@ def getEAZYimage(ID):
 
 	image = Image.open(cStringIO.StringIO(data))
 	end_time = time.time()
-	print("Fetching the EAZY image: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Fetching the EAZY image: " +str(end_time - start_time))
 
 	return image
 
@@ -71,7 +72,8 @@ def getBEAGLEimage(ID):
 
 	image = Image.open(cStringIO.StringIO(data))
 	end_time = time.time()
-	print("Fetching the BEAGLE image: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Fetching the BEAGLE image: " +str(end_time - start_time))
 
 	return image
 
@@ -148,31 +150,37 @@ def nextobject():
 	start_time = time.time()
 	image = cropEAZY(image)
 	end_time = time.time()
-	print("Cropping the EAZY image: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Cropping the EAZY image: " +str(end_time - start_time))
 	start_time = time.time()
 	photo = resizeimage(image)
 	end_time = time.time()
-	print("Resizing the EAZY image: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Resizing the EAZY image: " +str(end_time - start_time))
 	start_time = time.time()
 	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 	end_time = time.time()
-	print("Creating the EAZY canvas: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Creating the EAZY canvas: " +str(end_time - start_time))
 	
 	#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
 	new_image = getBEAGLEimage(current_id)
 	start_time = time.time()
 	new_photo = resizeimage(new_image)
 	end_time = time.time()
-	print("Resizing the BEAGLE image: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Resizing the BEAGLE image: " +str(end_time - start_time))
 	start_time = time.time()
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 	end_time = time.time()
-	print("Creating the BEAGLE canvas: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
 
 	start_time = time.time()
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 	end_time = time.time()
-	print("Creating the thumbnails: " +str(end_time - start_time))
+	if (timer_verbose):
+		print("Creating the thumbnails: " +str(end_time - start_time))
 
 def previousobject():
 	global ID_iterator
@@ -544,7 +552,8 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
 			plt.close('all')
 			end_time = time.time()
-			print("       Plotting Thumbnail: " +str(end_time - start_time))
+			if (timer_verbose):
+				print("       Plotting Thumbnail: " +str(end_time - start_time))
 
 	return fig_photo_objects
 
@@ -637,7 +646,7 @@ parser.add_argument(
   required=False
 )
 
-# User Depths 
+# command line argument list of objects
 parser.add_argument(
   '-idarglist',
   help="Command line argument list of objects",
@@ -647,11 +656,26 @@ parser.add_argument(
   required=False
 )
 
+# Timer Verbose
+parser.add_argument(
+  '-tverb',
+  help="Print timer values?",
+  action="store",
+  type=str,
+  dest="tverb",
+  required=False
+)
+
 
 args=parser.parse_args()
 
 if (args.input):
 	JADESView_input_file = args.input
+
+timer_verbose = False
+if (args.tverb):
+	timer_verbose = True
+
 
 # Right now, the default canvaswidth is 2000. 
 canvaswidth = 2000
