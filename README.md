@@ -115,8 +115,8 @@ file: `JADESView_input_file_webget.dat`:
 ```
 input_photometry       /Path/to/Photometric_Catalog.fits
 image_list             /Path/to/image_list.dat 
-EAZY_files             http://Path/to/EAZY_output_plots/on/fenrir/
-BEAGLE_files           http://Path/to/BEAGLE_output_plots/on/fenrir/
+EAZY_files             https://Path/to/EAZY_output_plots/on/fenrir/
+BEAGLE_files           https://Path/to/BEAGLE_output_plots/on/fenrir/
 output_flags_file      Object_Flags.fits
 output_notes_file      Object_Notes.txt
 canvaswidth            2000
@@ -127,7 +127,7 @@ fenrir_password        fenrir_password
 ``` 
 
 The paths to the EAZY and BEAGLE files on fenrir, as well as the username and password,
-are provided on the confluence page. It is recommended that you have a pretty speedy 
-internet connection, since this will add some time (in my tests, around 1 second per object) 
-for fetching the images from the server instead of on your local machine, but it saves 
-having to download tens of GB of png files.
+are provided on the confluence page (NOTE: you must use https). It is recommended that you 
+have a pretty speedy internet connection, since this will add some time (in my tests, around 
+1 second per object) for fetching the images from the server instead of on your local machine, 
+but it saves having to download tens of GB of png files.
