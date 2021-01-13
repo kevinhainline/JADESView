@@ -59,17 +59,22 @@ def highz():
 
 def badfit():
 	global current_index
+	global ID_iterator
+	global ID_list
 	global badfitflag_array
 	
 	badfitflag_array[current_index] = 1
-	
+	current_id = ID_list[ID_iterator]
 	print("Object "+str(current_id)+" has a bad fit.")
 
 def baddata():
 	global current_index
+	global ID_iterator
+	global ID_list
 	global baddataflag_array
 	
 	baddataflag_array[current_index] = 1
+	current_id = ID_list[ID_iterator]
 	print("Object "+str(current_id)+" object has bad data.")
 
 
