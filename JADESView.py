@@ -104,8 +104,9 @@ def nextobject():
 	canvas.delete(item5)
 	if (ID_iterator < len(ID_list)-1):
 		ID_iterator = ID_iterator+1
-	else:
-		ID_iterator = len(ID_list)-1
+#	else:
+#		len(ID_list)-1
+#		save_destroy()
 	
 	current_index = ID_list_indices[ID_iterator]
 	current_id = ID_list[ID_iterator]
@@ -485,6 +486,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 
 def save_destroy():
 	global ID_values
+	global current_index
 	global ID_iterator
 	global highZflag_array
 	global output_flags_file
@@ -519,7 +521,9 @@ def save_destroy():
 	outtab = Table(output_data, names=colnames, dtype=dtype)
 	outtab.write(output_flags_file)
 
-	notes_values[ID_iterator] = e2.get()
+	#notes_values[ID_iterator] = e2.get()
+	current_id = ID_list[ID_iterator]
+	notes_values[current_index] = e2.get()
 
 	w = open(output_notes_file, 'a')
 	w.write('#ID    Notes \n')
