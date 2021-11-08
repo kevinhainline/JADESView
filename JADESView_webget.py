@@ -3,10 +3,10 @@ import ast
 import sys
 import math
 import time # REMOVE THIS
-import urllib2
-import base64
-import cStringIO
 import argparse
+import requests
+from requests.auth import HTTPBasicAuth
+from io import BytesIO
 import numpy as np
 import matplotlib
 matplotlib.use("TkAgg")
@@ -42,17 +42,11 @@ defaultstretch = 'LogStretch'
 ra_dec_size_value = 2.0
 
 def getEAZYimage(ID):
-	
 	start_time = time.time()
 	EAZY_file_name = EAZY_files+str(ID)+'_EAZY_SED.png'
 
-	request = urllib2.Request(EAZY_file_name)
-	#base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
-	request.add_header("Authorization", "Basic %s" % base64string)   
-	result = urllib2.urlopen(request)
-	data = result.read()
-
-	image = Image.open(cStringIO.StringIO(data))
+	response = requests.get(EAZY_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+	image = Image.open(BytesIO(response.content))
 	end_time = time.time()
 	if (timer_verbose):
 		print("Fetching the EAZY image: " +str(end_time - start_time))
@@ -60,17 +54,11 @@ def getEAZYimage(ID):
 	return image
 
 def getBEAGLEimage(ID):
-
 	start_time = time.time()
 	BEAGLE_file_name = BEAGLE_files+str(ID)+'_BEAGLE_SED.png'
-	
-	request = urllib2.Request(BEAGLE_file_name)
-	#base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
-	request.add_header("Authorization", "Basic %s" % base64string)   
-	result = urllib2.urlopen(request)
-	data = result.read()
 
-	image = Image.open(cStringIO.StringIO(data))
+	response = requests.get(BEAGLE_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+	image = Image.open(BytesIO(response.content))
 	end_time = time.time()
 	if (timer_verbose):
 		print("Fetching the BEAGLE image: " +str(end_time - start_time))
@@ -716,7 +704,7 @@ for i in range(0, number_input_lines):
 	if (input_lines[i,0] == 'fenrir_password'):
 		fenrir_password = input_lines[i,1]
 
-base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
+#base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
 
 
 # # # # # # # # # # # # # # # # # # 
@@ -778,7 +766,7 @@ if ((number_images > 18) & (number_images <= 32)):
 eazy_positionx, eazy_positiony = 500*sf, 230*sf
 eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
-beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
+beagletext_positionx, beagletext_positiony = 1110*sf, 70*sf#1300*sf, 70*sf
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)

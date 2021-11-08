@@ -676,7 +676,7 @@ if ((number_images > 18) & (number_images <= 32)):
 eazy_positionx, eazy_positiony = 500*sf, 230*sf
 eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
-beagletext_positionx, beagletext_positiony = 1300*sf, 70*sf
+beagletext_positionx, beagletext_positiony = 1110*sf, 70*sf#1300*sf, 70*sf
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)

@@ -131,3 +131,17 @@ are provided on the confluence page (NOTE: you must use https). It is recommende
 have a pretty speedy internet connection, since this will add some time (in my tests, around 
 1 second per object) for fetching the images from the server instead of on your local machine, 
 but it saves having to download tens of GB of png files.
+
+## Installation
+
+While JADESView works under python3, you will need to use matplotlib v2.2.5. I recommend creating
+a conda environment using the attached `environment.yml` file:
+
+```
+% conda env create -f environment.yml
+```
+
+This will create a new conda environment, `jadesview`, from which you can run `JADESView` 
+and `JADESView_webget`.
+
+...or you could use the `requirements.txt` file to install these packages using `pip`. 
