@@ -24,7 +24,8 @@ downloading the photometric catalogs and the EAZY and BEAGLE plots from this web
 (The log-in details and the catalog descriptions are found [on confluence here](https://issues.cosmos.esa.int/jwst-nirspecwiki/display/WGs/Step+04+-+Photometric+redshifts+and+derived+information).)
 
 The tool requires numpy, matplotlib, tkinter, and astropy installations, and is written
-using Python 2.7. 
+using Python 3.0 (but will work under Python 2 as well). [You can learn more about the
+packages that are required here](https://github.com/kevinhainline/JADESView#installation). 
 
 The user will have to modify the file `JADESView_input_file.dat` to point to these files
 and also to specify some default parameters:
