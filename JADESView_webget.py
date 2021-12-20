@@ -931,8 +931,8 @@ btn2.place(x = 917*sf, y = bottomrow_y*sf)
 
 if ((args.id_number_list is None) & (args.idarglist is None)):
 	# Create the Object Entry Field and Button
-	Label(root, text="Display Object: ", font=('helvetica', textsizevalue)).place(x=1220*sf, y = (bottomrow_y+10.0)*sf)
-	e1 = Entry(root, width = int(5*sf), font=('helvetica', textsizevalue))
+	Label(root, text="Display Object: ", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=1220*sf, y = (bottomrow_y+10.0)*sf)
+	e1 = Entry(root, width = int(5*sf), font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff")
 	e1.place(x = 1370*sf, y = (bottomrow_y+6.0)*sf)
 
 	btn9 = Button(root, text = 'Go', bd = '5', command = gotoobject)  
