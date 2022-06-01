@@ -2,7 +2,11 @@ import os
 import ast
 import sys
 import math
+import time 
 import argparse
+import requests
+from requests.auth import HTTPBasicAuth
+from io import BytesIO
 import numpy as np
 import matplotlib
 matplotlib.use("TkAgg")
@@ -32,11 +36,61 @@ from PIL import ImageTk, Image
 JADESView_input_file = 'JADESView_input_file.dat'
 
 # The default stretch on the various images
-defaultstretch = 'LogStretch'
+defaultstretch = 'LinearStretch'
 
 # The default size of the various images
 ra_dec_size_value = 2.0
 
+# The default is to not make the crosshair
+make_crosshair = False
+
+def getEAZYimage(ID):
+	start_time = time.time()
+	EAZY_file_name = EAZY_files+str(ID)+'_EAZY_SED.png'
+
+	if (EAZY_file_name.startswith('http')):
+		response = requests.get(EAZY_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		image = Image.open(BytesIO(response.content))
+	else:
+		image = Image.open(EAZY_file_name)
+		
+	end_time = time.time()
+	if (timer_verbose):
+		print("Fetching the EAZY image: " +str(end_time - start_time))
+
+	return image
+
+def getBEAGLEimage(ID):
+	start_time = time.time()
+	BEAGLE_file_name = BEAGLE_files+str(ID)+'_BEAGLE_SED.png'
+
+	if (BEAGLE_file_name.startswith('http')):
+		response = requests.get(BEAGLE_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		image = Image.open(BytesIO(response.content))
+	else:
+		image = Image.open(BEAGLE_file_name)
+
+	end_time = time.time()
+	if (timer_verbose):
+		print("Fetching the BEAGLE image: " +str(end_time - start_time))
+
+	return image
+
+def getSEDzimage(ID):
+	start_time = time.time()
+	SEDz_file_name = SEDz_files+str(ID)+'_BEAGLE_SED.png'
+
+	if (SEDz_file_name.startswith('http')):
+		response = requests.get(SEDz_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		image = Image.open(BytesIO(response.content))
+	else:
+		image = Image.open(SEDz_file_name)
+		
+	end_time = time.time()
+	if (timer_verbose):
+		print("Fetching the SEDz image: " +str(end_time - start_time))
+
+	return image
 
 def resizeimage(image):
 	global baseplotwidth
@@ -45,7 +99,14 @@ def resizeimage(image):
 	image = image.resize((baseplotwidth, hsize), PIL.Image.ANTIALIAS)
 	photo = ImageTk.PhotoImage(image)
 	return photo
-	
+
+def resizeSOMzimage(image):
+	global SOMzbaseplotwidth
+	wpercent = (SOMzbaseplotwidth / float(image.size[0]))
+	hsize = int((float(image.size[1]) * float(wpercent)))
+	image = image.resize((SOMzbaseplotwidth, hsize), PIL.Image.ANTIALIAS)
+	photo = ImageTk.PhotoImage(image)
+	return photo
 
 def highz():
 	global current_index
@@ -77,6 +138,31 @@ def baddata():
 	current_id = ID_list[ID_iterator]
 	print("Object "+str(current_id)+" object has bad data.")
 
+def update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak):
+	eazy_z = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
+	eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
+	eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
+
+	eazy_label.configure(text="z_EAZY = "+str(eazy_z)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")")  
+
+def update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg):
+	beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
+	beagle_z_l68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zl68, 4)
+	beagle_z_u68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zu68, 4)
+	
+	beagle_label.configure(text="z_BEAGLE,avg = "+str(beagle_z_avg)+" ("+str(beagle_z_l68)+" - "+str(beagle_z_u68)+")")  
+	beagle_z_1 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_1, 4)
+	beagle_z_1_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_1, 4)
+	beagle_z1_label.configure(text="z_BEAGLE,1 = "+str(beagle_z_1)+" +/- "+str(beagle_z_1_err))  
+	beagle_z_2 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_2, 4)
+	beagle_z_2_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_2, 4)
+	beagle_z2_label.configure(text="z_BEAGLE,2 = "+str(beagle_z_2)+" +/- "+str(beagle_z_2_err))  
+
+	beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
+	beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
+	beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
+	beagle_prob_label.configure(text="P(z>2) = "+str(beagle_Pzgt2p0)+", P(z>4) = "+str(beagle_Pzgt4p0)+", P(z>4) = "+str(beagle_Pzgt6p0))  
+
 
 def nextobject():
 	global e2
@@ -97,6 +183,9 @@ def nextobject():
 	global beagle_positionx, beagle_positiony
 	global beagletext_positionx, beagletext_positiony
 
+	#global eazy_results_IDs, eazy_results_zpeak
+	#global beagle_results_IDs, eazy_results_zavg
+	
 	notes_values[current_index] = e2.get()
 	e2.delete(0,END)
 
@@ -107,21 +196,56 @@ def nextobject():
 #	else:
 #		len(ID_list)-1
 #		save_destroy()
-	
+		
 	current_index = ID_list_indices[ID_iterator]
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	image = getEAZYimage(current_id)
+	start_time = time.time()
 	image = cropEAZY(image)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Cropping the EAZY image: " +str(end_time - start_time))
+	start_time = time.time()
 	photo = resizeimage(image)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Resizing the EAZY image: " +str(end_time - start_time))
+	start_time = time.time()
 	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Creating the EAZY canvas: " +str(end_time - start_time))
 	
-	new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	new_image = getBEAGLEimage(current_id)
+	start_time = time.time()
 	new_photo = resizeimage(new_image)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Resizing the BEAGLE image: " +str(end_time - start_time))
+	start_time = time.time()
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
 
+	start_time = time.time()
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Creating the thumbnails: " +str(end_time - start_time))
+	
+	canvas.delete("separator")
+	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
+	if (EAZY_results_file):
+		update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
+	if (BEAGLE_results_file):
+		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
+
+
 
 def previousobject():
 	global ID_iterator
@@ -142,6 +266,9 @@ def previousobject():
 	global beagle_positionx, beagle_positiony
 	global beagletext_positionx, beagletext_positiony
 
+	#global eazy_results_IDs, eazy_results_zpeak
+	#global beagle_results_IDs, eazy_results_zavg
+
 	notes_values[current_index] = e2.get()
 	e2.delete(0,END)
 
@@ -156,16 +283,25 @@ def previousobject():
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+	image = getEAZYimage(current_id)
 	image = cropEAZY(image)
 	photo = resizeimage(image)
 	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 	
-	new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+	new_image = getBEAGLEimage(current_id)
 	new_photo = resizeimage(new_image)
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
+
+	canvas.delete("separator")
+	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="0abdc6", fill="#0abdc6", tags="separator")
+	if (EAZY_results_file):
+		update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
+	if (BEAGLE_results_file):
+		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
 
 
 def gotoobject():
@@ -188,6 +324,9 @@ def gotoobject():
 	global beagle_positionx, beagle_positiony
 	global beagletext_positionx, beagletext_positiony
 
+	#global eazy_results_IDs, eazy_results_zpeak
+	#global beagle_results_IDs, eazy_results_zavg
+
 	notes_values[current_index] = e2.get()
 	e2.delete(0,END)
 
@@ -202,19 +341,46 @@ def gotoobject():
 		current_id = ID_list[ID_iterator]
 		e2.insert(0, notes_values[current_index])
 	
-		image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+		#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+		image = getEAZYimage(current_id)
 		image = cropEAZY(image)
 		photo = resizeimage(image)
 		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 		
-		new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+		new_image = getBEAGLEimage(current_id)
 		new_photo = resizeimage(new_image)
 		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 	
 		fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
+
+		canvas.delete("separator")
+		redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
+		if (EAZY_results_file):
+			update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
+		if (BEAGLE_results_file):
+			update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
+
 	else:
 		print("That's not a valid ID number.")
 
+def togglecrosshair():
+	global ID_iterator
+	global ID_list
+	global ID_list_indices
+	global canvas   
+	global fig_photo_objects
+	global ra_dec_size_value
+	global defaultstretch
+
+	global make_crosshair
+	
+	if (make_crosshair == False):
+		make_crosshair = True
+	else:
+		make_crosshair = False
+		
+	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
 
 # This will remove the thumbnails, for future work
 def cropEAZY(img):
@@ -237,9 +403,9 @@ def linearstretch():
 	global btn6
 	global btn7
 
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 
 	defaultstretch = 'LinearStretch'	
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
@@ -257,9 +423,9 @@ def logstretch():
 	global btn6
 	global btn7
 
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 
 	defaultstretch = 'LogStretch'
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
@@ -277,9 +443,9 @@ def asinhstretch():
 	global btn6
 	global btn7
 
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', font=('helvetica', textsizevalue))
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', font=('helvetica', textsizevalue))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
 
 	defaultstretch = 'AsinhStretch'
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
@@ -396,28 +562,40 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 		
 		if (image_flux_value_err_cat[idx_cat, i] > -9999):
 			# Make the cutout
+			start_time = time.time()
 			image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
+			#end_time = time.time()
+			#print("       Running Cutout2D: " +str(end_time - start_time))
+			
+			SNR_fontsize_large = int(15.0*sf)
+			SNR_fontsize_small = int(12.0*sf)
 			
 			# Create the wcs axes
 			plt.clf()
 			fig = plt.figure(figsize=(thumbnailsize,thumbnailsize))
 			ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
-			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'black')
-			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'white')
+			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
+			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
 			if (number_images <= 18):
 				if (SNR_values[idx_cat, i] > -100):
-					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
+					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
 				else:
-					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=12, fontweight='bold', horizontalalignment='right', color = 'white')
+					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
 			else:
 				if (SNR_values[idx_cat, i] > -100):
-					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'white')
+					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
 				else:
-					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=9, fontweight='bold', horizontalalignment='right', color = 'white')
+					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
+					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
+			
+			if (make_crosshair == True):
+				ax3.plot([0.5, 0.5], [0.65, 0.8], linewidth=2.0, transform=ax3.transAxes, color = 'white')
+				ax3.plot([0.5, 0.5], [0.2, 0.35], linewidth=2.0, transform=ax3.transAxes, color = 'white')
+				ax3.plot([0.2, 0.35], [0.5, 0.5], linewidth=2.0, transform=ax3.transAxes, color = 'white')
+				ax3.plot([0.65, 0.8], [0.5, 0.5], linewidth=2.0, transform=ax3.transAxes, color = 'white')
 						
 			# Set the color map
 			plt.set_cmap('gray')
@@ -425,6 +603,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			indexerror = 0		
 			# Normalize the image using the min-max interval and a square root stretch
 			thumbnail = image_cutout.data
+			#start_time = time.time()
 			if (stretch == 'AsinhStretch'):
 				try:
 					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=AsinhStretch())
@@ -446,11 +625,16 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 					indexerror = 1
 				except UnboundLocalError:
 					indexerror = 1
+			#end_time = time.time()
+			#print("       Stretching Image: " +str(end_time - start_time))
 			
+			#start_time = time.time()
 			if (indexerror == 0):
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
 			else:
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
+			#end_time = time.time()
+			#print("       Plotting Thumbnail: " +str(end_time - start_time))
 			
 			if (number_images <= 18):
 				if (i <= 5):
@@ -479,6 +663,9 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			# Keep this handle alive, or else figure will disappear
 			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
 			plt.close('all')
+			end_time = time.time()
+			if (timer_verbose):
+				print("       Plotting Thumbnail: " +str(end_time - start_time))
 
 	return fig_photo_objects
 
@@ -535,6 +722,129 @@ def save_destroy():
 	quit()
 	#root.destroy()
 
+def plotbeagle():
+	global e2
+	global ID_iterator
+	global current_index
+	global ID_list
+	global ID_list_indices
+	global photo
+	global new_photo
+	global item4
+	global item5
+	global canvas   
+	global fig_photo_objects
+	global defaultstretch
+
+	global eazy_positionx, eazy_positiony
+	global eazytext_positionx, eazytext_positiony
+	global beagle_positionx, beagle_positiony
+	global beagletext_positionx, beagletext_positiony
+
+	notes_values[current_index] = e2.get()
+	e2.delete(0,END)
+
+	canvas.delete(item5)
+		
+	current_index = ID_list_indices[ID_iterator]
+	current_id = ID_list[ID_iterator]
+	e2.insert(0, notes_values[current_index])
+
+	new_image = getBEAGLEimage(current_id)
+	start_time = time.time()
+	new_photo = resizeimage(new_image)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Resizing the BEAGLE image: " +str(end_time - start_time))
+	start_time = time.time()
+	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
+		
+	
+def plotsomz():
+	global e2
+	global ID_iterator
+	global current_index
+	global ID_list
+	global ID_list_indices
+	global photo
+	global new_photo
+	global item4
+	global item5
+	global canvas   
+	global fig_photo_objects
+	global defaultstretch
+
+	global eazy_positionx, eazy_positiony
+	global eazytext_positionx, eazytext_positiony
+	global beagle_positionx, beagle_positiony
+	global beagletext_positionx, beagletext_positiony
+
+	notes_values[current_index] = e2.get()
+	e2.delete(0,END)
+
+	canvas.delete(item5)
+		
+	current_index = ID_list_indices[ID_iterator]
+	current_id = ID_list[ID_iterator]
+	e2.insert(0, notes_values[current_index])
+
+	new_image = getSOMzimage(current_id)
+	start_time = time.time()
+	new_photo = resizeSOMzimage(new_image)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Resizing the SOMz image: " +str(end_time - start_time))
+	start_time = time.time()
+	item5 = canvas.create_image(somz_positionx, somz_positiony, image=new_photo)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Creating the SOMz canvas: " +str(end_time - start_time))
+
+def plotsedz():
+	global e2
+	global ID_iterator
+	global current_index
+	global ID_list
+	global ID_list_indices
+	global photo
+	global new_photo
+	global item4
+	global item5
+	global canvas   
+	global fig_photo_objects
+	global defaultstretch
+
+	global eazy_positionx, eazy_positiony
+	global eazytext_positionx, eazytext_positiony
+	global beagle_positionx, beagle_positiony
+	global beagletext_positionx, beagletext_positiony
+
+	notes_values[current_index] = e2.get()
+	e2.delete(0,END)
+
+	canvas.delete(item5)
+		
+	current_index = ID_list_indices[ID_iterator]
+	current_id = ID_list[ID_iterator]
+	e2.insert(0, notes_values[current_index])
+
+	new_image = getSEDzimage(current_id)
+	start_time = time.time()
+	new_photo = resizeimage(new_image)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Resizing the SEDz image: " +str(end_time - start_time))
+	start_time = time.time()
+	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+	end_time = time.time()
+	if (timer_verbose):
+		print("Creating the SEDz canvas: " +str(end_time - start_time))
+
+def getfile_value(current_id, results_IDs, results_values, round_value):
+	return round(results_values[np.where(results_IDs == current_id)[0][0]],round_value)
 
 
 parser = argparse.ArgumentParser()
@@ -574,7 +884,7 @@ parser.add_argument(
   required=False
 )
 
-# User Depths 
+# command line argument list of objects
 parser.add_argument(
   '-idarglist',
   help="Command line argument list of objects",
@@ -584,14 +894,34 @@ parser.add_argument(
   required=False
 )
 
+# Timer Verbose
+parser.add_argument(
+  '-tverb',
+  help="Print timer values?",
+  action="store",
+  type=str,
+  dest="tverb",
+  required=False
+)
+
 
 args=parser.parse_args()
 
 if (args.input):
 	JADESView_input_file = args.input
 
+timer_verbose = False
+if (args.tverb):
+	timer_verbose = True
+
+
 # Right now, the default canvaswidth is 2000. 
 canvaswidth = 2000
+
+# I have to set these as false unless the file is specified in the input file
+EAZY_results_file_exists = False
+BEAGLE_results_file_exists = False
+NN_results_file_exists = False
 
 # Read in the various input values from the input file. 
 input_lines = np.loadtxt(JADESView_input_file, dtype='str')
@@ -603,8 +933,21 @@ for i in range(0, number_input_lines):
 		all_images_file_name = input_lines[i,1]
 	if (input_lines[i,0] == 'EAZY_files'):
 		EAZY_files = input_lines[i,1]
+	if (input_lines[i,0] == 'EAZY_results'):
+		EAZY_results_file = input_lines[i,1]
+		EAZY_results_file_exists = True
 	if (input_lines[i,0] == 'BEAGLE_files'):
 		BEAGLE_files = input_lines[i,1]
+	if (input_lines[i,0] == 'BEAGLE_results'):
+		BEAGLE_results_file = input_lines[i,1]
+		BEAGLE_results_file_exists = True
+	if (input_lines[i,0] == 'SOMz_files'):
+		SOMz_files = input_lines[i,1]
+	if (input_lines[i,0] == 'SEDz_files'):
+		SEDz_files = input_lines[i,1]
+	if (input_lines[i,0] == 'NN_results'):
+		NN_results_file = input_lines[i,1]
+		NN_results_file_exists = True
 	if (input_lines[i,0] == 'output_flags_file'):
 		output_flags_file = input_lines[i,1]
 	if (input_lines[i,0] == 'output_notes_file'):
@@ -615,7 +958,12 @@ for i in range(0, number_input_lines):
 		defaultstretch = input_lines[i,1]
 	if (input_lines[i,0] == 'ra_dec_size_value'):
 		ra_dec_size_value = float(input_lines[i,1])
-	
+	if (input_lines[i,0] == 'fenrir_username'):
+		fenrir_username = input_lines[i,1]
+	if (input_lines[i,0] == 'fenrir_password'):
+		fenrir_password = input_lines[i,1]
+
+#base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
 
 # # # # # # # # # # # # # # # # # # 
 # Let's open up all the input files
@@ -644,6 +992,9 @@ sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canva
                           # RECOGNIZE THAT I SHOULD PUT THINGS ON A GRID, BUT THAT
                           # WILL COME IN A FUTURE UPDATE, OK
 
+# The fontsize depends on this
+fontsize = str(int(20*sf))
+
 # We use the number of images we have to to set the canvasheight
 if (number_images <= 6):
 	canvasheight = (canvaswidth*(1.0 / 2.35))  # I lock everything to a 2.35:1 aspect ratio
@@ -653,6 +1004,7 @@ if (number_images > 12):
 	canvasheight = (canvaswidth*(1.0 / 1.8))  # I lock everything to a 1.8:1 aspect ratio
 
 baseplotwidth = int(1000*sf)
+SOMzbaseplotwidth = int(800*sf)
 textsizevalue = int(20*sf)
 thumbnailsize = 1.5*sf
 
@@ -677,6 +1029,7 @@ eazy_positionx, eazy_positiony = 500*sf, 230*sf
 eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
 beagletext_positionx, beagletext_positiony = 1110*sf, 70*sf#1300*sf, 70*sf
+somz_positionx, somz_positiony = 1490*sf, 350*sf
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)
@@ -696,6 +1049,45 @@ for j in range(0, number_image_filters):
 
 number_input_objects = len(ID_values)
 ID_iterator = 0
+
+if (EAZY_results_file_exists):
+	if (EAZY_results_file.startswith('http')):
+		response = requests.get(EAZY_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		eazy_fits_file = BytesIO(response.content)
+	else:
+		eazy_fits_file = EAZY_results_file
+	eazy_results_fits = fits.open(eazy_fits_file)
+	eazy_results_IDs = eazy_results_fits[1].data['ID'].astype('int')
+	eazy_results_zpeak = eazy_results_fits[1].data['z_peak']
+	eazy_results_zl68 = eazy_results_fits[1].data['l68']
+	eazy_results_zu68 = eazy_results_fits[1].data['u68']
+	#eazy_results_zl95 = eazy_results_fits[1].data['l95']
+	#eazy_results_zu95 = eazy_results_fits[1].data['u95']
+
+
+if (BEAGLE_results_file_exists):
+	if (BEAGLE_results_file.startswith('http')):
+		response = requests.get(BEAGLE_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		beagle_fits_file = BytesIO(response.content)
+	else:
+		beagle_fits_file = BEAGLE_results_file
+		
+	beagle_results_fits = fits.open(beagle_fits_file)
+	beagle_ID_str = beagle_results_fits[1].data['ID']
+	beagle_results_IDs = np.zeros(len(beagle_ID_str), dtype = 'int')
+	for j in range(0, len(beagle_ID_str)):
+		beagle_results_IDs[j] = int(beagle_ID_str[j])
+
+	beagle_results_zavg = beagle_results_fits[1].data['redshift_beagle_mean']
+	beagle_results_redshift_1 = beagle_results_fits[1].data['redshift_beagle_1']
+	beagle_results_redshift_err_1 = beagle_results_fits[1].data['redshift_beagle_err_1']
+	beagle_results_redshift_2 = beagle_results_fits[1].data['redshift_beagle_2']
+	beagle_results_redshift_err_2 = beagle_results_fits[1].data['redshift_beagle_err_2']
+	beagle_results_zl68 = beagle_results_fits[1].data['redshift_68.0_low']
+	beagle_results_zu68 = beagle_results_fits[1].data['redshift_68.0_up']
+	beagle_results_Pzgt2p0 = beagle_results_fits[1].data['redshift_p_gt_2.0']
+	beagle_results_Pzgt4p0 = beagle_results_fits[1].data['redshift_p_gt_4.0']
+	beagle_results_Pzgt6p0 = beagle_results_fits[1].data['redshift_p_gt_6.0']
 
 # Decide whether or not the user requested an ID number or an id number list
 if (args.id_number):
@@ -781,26 +1173,84 @@ root.wm_title("JADESView")
 canvas=Canvas(root, height=canvasheight, width=canvaswidth, bg="#ffffff")
 
 # Plot the EAZY SED
-image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+image = getEAZYimage(current_id)
 
 # Crop out the thumbnails
 image = cropEAZY(image)
 
 photo = resizeimage(image)
 item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-Label(root, text="EAZY FIT", font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
+#Label(root, text="EAZY FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
 
 # Plot the BEAGLE SED
-new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+new_image = getBEAGLEimage(current_id)
 new_photo = resizeimage(new_image)
 item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-Label(root, text="BEAGLE FIT", font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
-	
+#Label(root, text="BEAGLE FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
+
 canvas.pack(side = TOP, expand=True, fill=BOTH)
 
 # Plot the thumbnails
 fig_photo_objects = np.empty(0, dtype = 'object')
 fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
+
+# # # # # # # # # # # # # # 
+# Place Labels with Redshift 
+
+# #711c91, #ea00d9, #0abdc6, #133e7c, #091833
+
+# A delineation line. 
+redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
+
+
+# Make the EAZY redshift label
+if (EAZY_results_file):
+	eazy_z = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
+	eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
+	eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
+
+	eazy_label = Label(root, text="z_EAZY = "+str(eazy_z)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", font = "Helvetica "+str(textsizevalue), fg="#133e7c", bg="#ffffff")
+	eazy_label.place(x=1100*sf, y = (toprow_y-290.0)*sf)
+
+
+# Make the BEAGLE redshift labels
+if (BEAGLE_results_file):
+	beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
+	beagle_z_l68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zl68, 4)
+	beagle_z_u68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zu68, 4)
+	
+	beagle_label = Label(root, text="z_BEAGLE,avg = "+str(beagle_z_avg)+" ("+str(beagle_z_l68)+" - "+str(beagle_z_u68)+")", font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
+	beagle_label.place(x=1100*sf, y = (toprow_y-210.0)*sf)
+	
+	beagle_z_1 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_1, 4)
+	beagle_z_1_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_1, 4)
+	beagle_z1_label = Label(root, text="z_BEAGLE,1 = "+str(beagle_z_1)+" +/- "+str(beagle_z_1_err), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
+	beagle_z1_label.place(x=1100*sf, y = (toprow_y-170.0)*sf)
+	
+	beagle_z_2 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_2, 4)
+	beagle_z_2_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_2, 4)
+	beagle_z2_label = Label(root, text="z_BEAGLE,2 = "+str(beagle_z_2)+" +/- "+str(beagle_z_2_err), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
+	beagle_z2_label.place(x=1100*sf, y = (toprow_y-130.0)*sf)
+
+	beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
+	beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
+	beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
+	beagle_prob_label = Label(root, text="P(z>2) = "+str(beagle_Pzgt2p0)+", P(z>4) = "+str(beagle_Pzgt4p0)+", P(z>4) = "+str(beagle_Pzgt6p0), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
+	beagle_prob_label.place(x=1100*sf, y = (toprow_y-90.0)*sf)
+
+#NN_z = 5.000
+if (NN_results_file_exists):
+	NN_redshift = getfile_value(current_id, NN_results_IDs, NN_results_redshift, 4)
+	nn_label = Label(root, text="z_NN = "+str(NN_redshift), font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+	nn_label.place(x=1500*sf, y = (toprow_y-210.0)*sf)
+
+#SEDz_z = 5.000
+#Label(root, text="z_SEDz = ", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1100*sf, y = (toprow_y-210.0)*sf)
+
+#S3_z = 5.000
+#Label(root, text="z_S3 = ", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1100*sf, y = (toprow_y-170.0)*sf)
 
 
 # # # # # # # # # # # #
@@ -809,17 +1259,17 @@ fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, cur
 # Create the Bad Fit Flag
 btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
 btn1.config(height = int(2*sf), width = int(13*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn1.place(x = 600*sf, y = toprow_y*sf)
+btn1.place(x = 600*sf, y = (toprow_y-20)*sf)
 
 # Create the High Redshift Flag Button
 btn1 = Button(root, text = 'High Redshift', bd = '5', command = highz)
-btn1.config(height = int(2*sf), width = int(13*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue), padx = 20, pady = 3)
-btn1.place(x = 785*sf, y = toprow_y*sf)
+btn1.config(height = int(2*sf), width = int(11*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue), padx = 20, pady = 3)
+btn1.place(x = 793*sf, y = (toprow_y-20)*sf)
 
 # Create the Bad Data Flag
 btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
 btn1.config(height = int(2*sf), width = int(13*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn1.place(x = 1000*sf, y = toprow_y*sf)
+btn1.place(x = 1000*sf, y = (toprow_y-20)*sf)
 
 
 # # # # # # # # # # # #
@@ -861,7 +1311,7 @@ btn4.place(x = 1850*sf, y = (bottomrow_y+10.0)*sf)
 
 btn4 = Button(root, text = 'Save Canvas', bd = '5', command = save_canvas)  
 btn4.config(height = int(2*sf), width = int(15*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue))
-btn4.place(x = 1650*sf, y = (bottomrow_y+10.0)*sf)
+btn4.place(x = 1645*sf, y = (bottomrow_y+10.0)*sf)
  
 
 # # # # # # # # # # # #
@@ -872,7 +1322,7 @@ Label(root, text="Stretch", font = ('helvetica', int(20*sf)), fg="#000000", bg='
 # Create the LinearStretch Button
 btn5 = Button(root, text = 'Linear', bd = '5', command = linearstretch)  
 if (defaultstretch == 'LinearStretch'):
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue))
+	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
 else:
 	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 btn5.place(x = 100*sf, y = (bottomrow_y+10.0)*sf)
@@ -881,7 +1331,7 @@ btn5.place(x = 100*sf, y = (bottomrow_y+10.0)*sf)
 # Create the LogStretch Button
 btn6 = Button(root, text = 'Log', bd = '5', command = logstretch)  
 if (defaultstretch == 'LogStretch'):
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue))
+	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
 else:
 	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 btn6.place(x = 250*sf, y = (bottomrow_y+10.0)*sf)
@@ -889,12 +1339,14 @@ btn6.place(x = 250*sf, y = (bottomrow_y+10.0)*sf)
 
 # Create the Asinh Button
 btn7 = Button(root, text = 'Asinh', bd = '5', command = asinhstretch)  
-if (defaultstretch == 'LinearStretch'):
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue))
+if (defaultstretch == 'AsinhStretch'):
+	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
 else:
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 btn7.place(x = 400*sf, y = (bottomrow_y+10.0)*sf)
 
+# # # # # # # # #  
+# Notes / RA/DEC
 
 # Create the Notes Field
 Label(root, text="Notes", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1220*sf, y = (toprow_y+5.0)*sf)
@@ -910,6 +1362,30 @@ e3.insert(0, str(ra_dec_size_value))
 Label(root, text="arcseconds", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=280*sf, y = (toprow_y+15.0)*sf)
 btn8 = Button(root, text = 'Change', bd = '5', command = changeradecsize)  
 btn8.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-btn8.place(x = 400*sf, y = (toprow_y+15.0)*sf)
+btn8.place(x = 400*sf, y = (toprow_y+13.0)*sf)
+
+btn12 = Button(root, text = 'Crosshair', bd = '5', command = togglecrosshair)  
+btn12.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+btn12.place(x = 400*sf, y = (toprow_y-25.0)*sf)
+
+
+# # # # # # # # #  
+# Alternate Fits 
+
+# The button to plot the SEDz results
+btn9 = Button(root, text = 'BEAGLE', bd = '5', command = plotbeagle)  
+btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
+
+# The button to plot the SOMz results
+#btn10 = Button(root, text = 'S3', bd = '5', command = plotsomz)  
+#btn10.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+#btn10.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
+
+# The button to plot the SEDz results
+btn11 = Button(root, text = 'SEDz', bd = '5', command = plotsedz)  
+btn11.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+btn11.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
+
 
 root.mainloop()
