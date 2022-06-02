@@ -161,7 +161,7 @@ def update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg):
 	beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
 	beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
 	beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
-	beagle_prob_label.configure(text="P(z>2) = "+str(beagle_Pzgt2p0)+", P(z>4) = "+str(beagle_Pzgt4p0)+", P(z>4) = "+str(beagle_Pzgt6p0))  
+	beagle_prob_label.configure(text="P(z > 2) = "+str(beagle_Pzgt2p0)+", P(z > 4) = "+str(beagle_Pzgt4p0)+", P(z > 4) = "+str(beagle_Pzgt6p0))  
 
 
 def nextobject():
@@ -377,8 +377,11 @@ def togglecrosshair():
 	
 	if (make_crosshair == False):
 		make_crosshair = True
+		btn12.config(font=('helvetica bold', textsizevalue))
+
 	else:
 		make_crosshair = False
+		btn12.config(font=('helvetica', textsizevalue))
 		
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
 
@@ -761,7 +764,10 @@ def plotbeagle():
 	end_time = time.time()
 	if (timer_verbose):
 		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
-		
+	
+	btn9.config(font=('helvetica bold', textsizevalue))
+	btn11.config(font=('helvetica', textsizevalue))
+	
 	
 def plotsomz():
 	global e2
@@ -842,6 +848,10 @@ def plotsedz():
 	end_time = time.time()
 	if (timer_verbose):
 		print("Creating the SEDz canvas: " +str(end_time - start_time))
+
+	btn9.config(font=('helvetica', textsizevalue))
+	btn11.config(font=('helvetica bold', textsizevalue))
+
 
 def getfile_value(current_id, results_IDs, results_values, round_value):
 	return round(results_values[np.where(results_IDs == current_id)[0][0]],round_value)
@@ -1026,7 +1036,7 @@ if ((number_images > 18) & (number_images <= 32)):
 
 # These do not change depending on the number of images we have.
 eazy_positionx, eazy_positiony = 500*sf, 230*sf
-eazytext_positionx, eazytext_positiony = 350*sf, 70*sf
+eazytext_positionx, eazytext_positiony = 350*sf, 10*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
 beagletext_positionx, beagletext_positiony = 1110*sf, 70*sf#1300*sf, 70*sf
 somz_positionx, somz_positiony = 1490*sf, 350*sf
@@ -1160,8 +1170,6 @@ baddataflag_array = np.zeros(number_input_objects, dtype = 'int')
 #   ID_iterator - an iterator that keeps track of the index of the ID_list_indices array
 #                 is currently being shown
 
-
-
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Now, everything is set up, so let's start creating the GUI
 
@@ -1178,10 +1186,9 @@ image = getEAZYimage(current_id)
 
 # Crop out the thumbnails
 image = cropEAZY(image)
-
 photo = resizeimage(image)
 item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-#Label(root, text="EAZY FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
+Label(root, text="EAZY FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
 
 # Plot the BEAGLE SED
 #new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
@@ -1237,7 +1244,7 @@ if (BEAGLE_results_file):
 	beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
 	beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
 	beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
-	beagle_prob_label = Label(root, text="P(z>2) = "+str(beagle_Pzgt2p0)+", P(z>4) = "+str(beagle_Pzgt4p0)+", P(z>4) = "+str(beagle_Pzgt6p0), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
+	beagle_prob_label = Label(root, text="P(z > 2) = "+str(beagle_Pzgt2p0)+", P(z > 4) = "+str(beagle_Pzgt4p0)+", P(z > 4) = "+str(beagle_Pzgt6p0), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
 	beagle_prob_label.place(x=1100*sf, y = (toprow_y-90.0)*sf)
 
 #NN_z = 5.000
@@ -1374,7 +1381,7 @@ btn12.place(x = 400*sf, y = (toprow_y-25.0)*sf)
 
 # The button to plot the SEDz results
 btn9 = Button(root, text = 'BEAGLE', bd = '5', command = plotbeagle)  
-btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica bold', textsizevalue))
 btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
 
 # The button to plot the SOMz results
