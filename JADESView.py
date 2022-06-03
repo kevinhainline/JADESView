@@ -44,6 +44,9 @@ ra_dec_size_value = 2.0
 # The default is to not make the crosshair
 make_crosshair = False
 
+# Currently, for testing JADESView, we have z_spec
+use_zspec = True
+
 def getEAZYimage(ID):
 	start_time = time.time()
 	EAZY_file_name = EAZY_files+str(ID)+'_EAZY_SED.png'
@@ -163,6 +166,15 @@ def update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg):
 	beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
 	beagle_prob_label.configure(text="P(z > 2) = "+str(beagle_Pzgt2p0)+", P(z > 4) = "+str(beagle_Pzgt4p0)+", P(z > 4) = "+str(beagle_Pzgt6p0))  
 
+def update_NN_text(current_id, NN_results_IDs, NN_results_zpred):
+
+	NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
+	nn_label.configure(text="z_NN = "+str(NN_zpred))  
+
+	if(use_zspec == True):
+		NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
+		nn_label_zspec.configure(text="z_spec = "+str(NN_zspec))  
+		
 
 def nextobject():
 	global e2
@@ -240,11 +252,12 @@ def nextobject():
 	
 	canvas.delete("separator")
 	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
-	if (EAZY_results_file):
+	if (EAZY_results_file_exists):
 		update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
-	if (BEAGLE_results_file):
+	if (BEAGLE_results_file_exists):
 		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
-
+	if (NN_results_file_exists):
+		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
 
 
 def previousobject():
@@ -297,11 +310,13 @@ def previousobject():
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 
 	canvas.delete("separator")
-	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="0abdc6", fill="#0abdc6", tags="separator")
-	if (EAZY_results_file):
+	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
+	if (EAZY_results_file_exists):
 		update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
-	if (BEAGLE_results_file):
+	if (BEAGLE_results_file_exists):
 		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
+	if (NN_results_file_exists):
+		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
 
 
 def gotoobject():
@@ -356,10 +371,12 @@ def gotoobject():
 
 		canvas.delete("separator")
 		redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
-		if (EAZY_results_file):
+		if (EAZY_results_file_exists):
 			update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
-		if (BEAGLE_results_file):
+		if (BEAGLE_results_file_exists):
 			update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
+		if (NN_results_file_exists):
+			update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
 
 	else:
 		print("That's not a valid ID number.")
@@ -1099,6 +1116,19 @@ if (BEAGLE_results_file_exists):
 	beagle_results_Pzgt4p0 = beagle_results_fits[1].data['redshift_p_gt_4.0']
 	beagle_results_Pzgt6p0 = beagle_results_fits[1].data['redshift_p_gt_6.0']
 
+if (NN_results_file_exists):
+	if (NN_results_file.startswith('http')):
+		response = requests.get(NN_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		NN_fits_file = BytesIO(response.content)
+	else:
+		NN_fits_file = NN_results_file
+
+	NN_results_fits = fits.open(NN_fits_file)
+	NN_results_IDs = NN_results_fits[1].data['ID_PHOTOMETRIC'].astype('int')
+	NN_results_zpred = NN_results_fits[1].data['pred_z']
+	NN_results_zspec = NN_results_fits[1].data['true_z']
+		
+
 # Decide whether or not the user requested an ID number or an id number list
 if (args.id_number):
 	ID_list = ID_values
@@ -1249,9 +1279,14 @@ if (BEAGLE_results_file):
 
 #NN_z = 5.000
 if (NN_results_file_exists):
-	NN_redshift = getfile_value(current_id, NN_results_IDs, NN_results_redshift, 4)
+	NN_redshift = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
+	NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
 	nn_label = Label(root, text="z_NN = "+str(NN_redshift), font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
-	nn_label.place(x=1500*sf, y = (toprow_y-210.0)*sf)
+	#nn_label.place(x=1800*sf, y = (toprow_y-210.0)*sf)
+	nn_label.place(x=1100*sf, y = (toprow_y-250.0)*sf)
+	if (use_zspec == True):
+		nn_label_zspec = Label(root, text="z_spec = "+str(NN_zspec), font = "Helvetica "+str(textsizevalue)+" bold", fg="red", bg="#ffffff")
+		nn_label_zspec.place(x=1760*sf, y = (toprow_y-290.0)*sf)
 
 #SEDz_z = 5.000
 #Label(root, text="z_SEDz = ", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1100*sf, y = (toprow_y-210.0)*sf)
