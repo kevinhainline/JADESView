@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 import os
 import ast
 import sys
@@ -871,8 +873,11 @@ def plotsedz():
 
 
 def getfile_value(current_id, results_IDs, results_values, round_value):
-	return round(results_values[np.where(results_IDs == current_id)[0][0]],round_value)
-
+	find_value_index = np.where(results_IDs == current_id)[0]
+	if (len(find_value_index) > 0):
+		return round(results_values[find_value_index[0]],round_value)
+	else:
+		return -9999
 
 parser = argparse.ArgumentParser()
 
@@ -1079,7 +1084,7 @@ ID_iterator = 0
 
 if (EAZY_results_file_exists):
 	if (EAZY_results_file.startswith('http')):
-		response = requests.get(EAZY_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		response = requests.get(EAZY_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password), headers={'Content-Encoding': 'gzip'})
 		eazy_fits_file = BytesIO(response.content)
 	else:
 		eazy_fits_file = EAZY_results_file
@@ -1094,7 +1099,7 @@ if (EAZY_results_file_exists):
 
 if (BEAGLE_results_file_exists):
 	if (BEAGLE_results_file.startswith('http')):
-		response = requests.get(BEAGLE_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		response = requests.get(BEAGLE_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password), headers={'Content-Encoding': 'gzip'})
 		beagle_fits_file = BytesIO(response.content)
 	else:
 		beagle_fits_file = BEAGLE_results_file
@@ -1118,7 +1123,7 @@ if (BEAGLE_results_file_exists):
 
 if (NN_results_file_exists):
 	if (NN_results_file.startswith('http')):
-		response = requests.get(NN_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		response = requests.get(NN_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password), headers={'Content-Encoding': 'gzip'})
 		NN_fits_file = BytesIO(response.content)
 	else:
 		NN_fits_file = NN_results_file
