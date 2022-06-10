@@ -37,20 +37,21 @@ The user will have to modify the file `JADESView_input_file.dat` to point to the
 and also to specify some default parameters:
 
 ```
-input_photometry       /Path/to/Photometric_Catalog.fits
-image_list             /Path/to/image_list.dat 
-EAZY_files             /Path/to/EAZY_output_plots/
-EAZY_results           /Path/to/EAZY_results_summary.fits
-BEAGLE_files           /Path/to/BEAGLE_output_plots/
-BEAGLE_results         /Path/to/Beagle_VAC.fits
-output_flags_file      Object_Flags.fits
-output_notes_file      Object_Notes.txt
-canvasheight           1000
-canvaswidth            2000
-defaultstretch         AsinhStretch
-ra_dec_size_value      2.0
-fenrir_username        fenrir_username
-fenrir_password        fenrir_password
+input_photometry         /Path/to/Photometric_Catalog.fits
+image_list               /Path/to/image_list.dat 
+EAZY_files               /Path/to/EAZY_output_plots/
+EAZY_results             /Path/to/EAZY_results_summary.fits
+BEAGLE_files             /Path/to/BEAGLE_output_plots/
+BEAGLE_results           /Path/to/Beagle_VAC.fits
+color_selection_results  /Path/to/Dropouts.fits
+output_flags_file        Object_Flags.fits
+output_notes_file        Object_Notes.txt
+canvasheight             1000
+canvaswidth              2000
+defaultstretch           AsinhStretch
+ra_dec_size_value        2.0
+fenrir_username          fenrir_username
+fenrir_password          fenrir_password
 ```
 
 In this file, do not modify the first column, but replace the values in the second column
@@ -77,7 +78,9 @@ that contain the EAZY and BEAGLE output plots from the above linked repository. 
 user specifies an `EAZY_results` (the `EAZY_results_summary.fits` file that is also found on
 fenrir) and `BEAGLE_results` (the `*_BEAGLE_VAC.fits` file that is also found on fenrir) files, 
 which contain the output photometric redshifts, these values will be printed to the window for
-each object. 
+each object. Similarly, the `color_selection_results` file has the objects in the sample and flags
+for whether or not they're F090W, F115W, and F150W dropouts, and specifies within JADESView whether
+or not this object is flagged as such.  
 
 Note that the current version will allow the user to change the canvaswidth (default: 2000 pixels), 
 and hopefully everything will  scale so that you can use the code on smaller monitors. 

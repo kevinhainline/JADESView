@@ -33,7 +33,7 @@ try:
 except ImportError:
     from tkinter import *
 import PIL
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, ImageGrab
 
 JADESView_input_file = 'JADESView_input_file.dat'
 
@@ -144,11 +144,14 @@ def baddata():
 	print("Object "+str(current_id)+" object has bad data.")
 
 def update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak):
-	eazy_z = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
+	eazy_z_peak = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
+	eazy_z_a = getfile_value(current_id, eazy_results_IDs, eazy_results_za, 4)
 	eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
 	eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
 
-	eazy_label.configure(text="z_EAZY = "+str(eazy_z)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")")  
+	eazy_label_zpeak.configure(text="z_EAZY, peak = "+str(eazy_z_peak)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")")  
+	eazy_label_za.configure(text="z_EAZY, a = "+str(eazy_z_a))  
+
 
 def update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg):
 	beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
@@ -176,6 +179,22 @@ def update_NN_text(current_id, NN_results_IDs, NN_results_zpred):
 	if(use_zspec == True):
 		NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
 		nn_label_zspec.configure(text="z_spec = "+str(NN_zspec))  
+	
+def update_color_selection_text(current_id, color_selection_results_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts):
+	is_F090W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F090W_dropouts)
+	is_F115W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F115W_dropouts)
+	is_F150W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F150W_dropouts)
+
+	if (is_F090W_dropout):
+		color_selection_label.configure(text="F090W Dropout")  
+	elif (is_F115W_dropout):
+		color_selection_label.configure(text="F115W Dropout")  
+	elif (is_F150W_dropout):
+		color_selection_label.configure(text="F150W Dropout")  
+	else:
+		color_selection_label.configure(text=" ")  
+		
+
 		
 
 def nextobject():
@@ -260,7 +279,8 @@ def nextobject():
 		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
 	if (NN_results_file_exists):
 		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
-
+	if (color_selection_results_file_exists):
+		update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
 
 def previousobject():
 	global ID_iterator
@@ -319,6 +339,8 @@ def previousobject():
 		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
 	if (NN_results_file_exists):
 		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
+	if (color_selection_results_file_exists):
+		update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
 
 
 def gotoobject():
@@ -379,6 +401,8 @@ def gotoobject():
 			update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
 		if (NN_results_file_exists):
 			update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
+		if (color_selection_results_file_exists):
+			update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
 
 	else:
 		print("That's not a valid ID number.")
@@ -483,12 +507,13 @@ def save_canvas():
 	global ID_iterator
 	global e3
 
+	current_id = ID_list[ID_iterator]
+
 	ra_dec_size_value = float(e3.get())
 
 	fig = plt.figure(figsize=(thumbnailsize*2.51,thumbnailsize/4.0))
 	ax8 = fig.add_axes([0, 0, 1, 1])
-	ax8.text(0.1, 0.5, "Image Size: "+str(ra_dec_size_value)+"\" x "+str(ra_dec_size_value)+"\"", transform=ax8.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
-	
+	ax8.text(0.02, 0.5, "Image Size: "+str(ra_dec_size_value)+"\" x "+str(ra_dec_size_value)+"\"", transform=ax8.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
 	fig_x = 20*sf
 	if (number_images <= 6):
 		fig_y = 760*sf
@@ -499,16 +524,76 @@ def save_canvas():
 
 	fig_size_object = draw_figure(canvas, fig, loc=(fig_x, fig_y))
 
-	current_id = ID_list[ID_iterator]
+	#fig = plt.figure(figsize=(thumbnailsize*2.51,thumbnailsize/4.0))
+	fig2 = plt.figure(figsize=(7, 2.5))
+	ax9 = fig2.add_axes([0, 0, 1, 1])
+	if (EAZY_results_file_exists):
+		eazy_z_peak = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
+		eazy_z_a = getfile_value(current_id, eazy_results_IDs, eazy_results_za, 4)
+		eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
+		eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
+		ax9.text(0.02, 0.9, "z_EAZY, peak = "+str(eazy_z_peak)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#133e7c')
+		ax9.text(0.02, 0.8, "z_EAZY, peak = "+str(eazy_z_a), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#133e7c')
+	if (BEAGLE_results_file_exists):
+		beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
+		beagle_z_l68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zl68, 4)
+		beagle_z_u68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zu68, 4)
+		
+		beagle_z_1 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_1, 4)
+		beagle_z_1_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_1, 4)
+		beagle_z_2 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_2, 4)
+		beagle_z_2_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_2, 4)
+	
+		beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
+		beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
+		beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
+
+		ax9.text(0.02, 0.7, "z_BEAGLE,avg = "+str(beagle_z_avg)+" ("+str(beagle_z_l68)+" - "+str(beagle_z_u68)+")", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
+		ax9.text(0.02, 0.6, "z_BEAGLE,1 = "+str(beagle_z_1)+" +/- "+str(beagle_z_1_err), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
+		ax9.text(0.02, 0.5, "z_BEAGLE,2 = "+str(beagle_z_2)+" +/- "+str(beagle_z_2_err), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
+		ax9.text(0.02, 0.4, "P(z > 2) = "+str(beagle_Pzgt2p0)+", P(z > 4) = "+str(beagle_Pzgt4p0)+", P(z > 4) = "+str(beagle_Pzgt6p0), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
+	if (NN_results_file_exists):
+		NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
+		ax9.text(0.98, 0.9, "z_NN = "+str(NN_zpred), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = '#091833')		
+		if (use_zspec == True):
+			NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
+			ax9.text(0.98, 0.8, "z_spec = "+str(NN_zspec), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'red')		
+	if (color_selection_results_file_exists):
+		is_F090W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F090W_dropouts)
+		is_F115W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F115W_dropouts)
+		is_F150W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F150W_dropouts)
+
+		if (is_F090W_dropout):
+			ax9.text(0.98, 0.1, "F090W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
+		elif (is_F115W_dropout):
+			ax9.text(0.98, 0.1, "F115W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
+		elif (is_F150W_dropout):
+			ax9.text(0.98, 0.1, "F150W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
+
+
+	fig2_x = 950
+	fig2_y = 650
+	
+	fig2_size_object = draw_figure(canvas, fig2, loc=(fig2_x, fig2_y))
+	#fig.close()
+
+	# The text needs to be at: 1100, 600
+	#fig2 = plt.figure(figsize=(500,200))
+	#ax9 = fig.add_axes([0, 0, 1, 1])
+	#ax9.text(0.1, 0.1, "z_EAZY = "+str(eazy_z)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", transform=ax9.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
+	#fig_x = 1100
+	#fig_y = 600
+	#fig_redshift_object = draw_figure(canvas, fig2, loc=(fig_x, fig_y))
+	#fig2.close()
 
 	output_filename = str(current_id)+'_JADESView'
 	canvas.postscript(file=output_filename+'.eps', colormode='color')
+	
 	# use PIL to convert to PNG 
 	img = Image.open(output_filename+'.eps') 
-	#os.system('rm '+output_filename+'.eps')
+	os.system('rm '+output_filename+'.eps')
 	#print output_filename+'.png'
-	#img.save(output_filename+'.png', 'png') 
-
+	img.save(output_filename+'.png', 'png') 
 
 def changeradecsize():
 	global ID_iterator
@@ -879,6 +964,14 @@ def getfile_value(current_id, results_IDs, results_values, round_value):
 	else:
 		return -9999
 
+def getfile_true_or_false(current_id, results_IDs, results_values):
+	find_value_index = np.where(results_IDs == current_id)[0]
+	if (len(find_value_index) > 0):
+		return results_values[find_value_index[0]] 
+	else:
+		return False
+
+
 parser = argparse.ArgumentParser()
 
 ######################
@@ -954,6 +1047,7 @@ canvaswidth = 2000
 EAZY_results_file_exists = False
 BEAGLE_results_file_exists = False
 NN_results_file_exists = False
+color_selection_results_file_exists = False
 
 # Read in the various input values from the input file. 
 input_lines = np.loadtxt(JADESView_input_file, dtype='str')
@@ -980,6 +1074,9 @@ for i in range(0, number_input_lines):
 	if (input_lines[i,0] == 'NN_results'):
 		NN_results_file = input_lines[i,1]
 		NN_results_file_exists = True
+	if (input_lines[i,0] == 'color_selection_results'):
+		color_selection_results_file = input_lines[i,1]
+		color_selection_results_file_exists = True
 	if (input_lines[i,0] == 'output_flags_file'):
 		output_flags_file = input_lines[i,1]
 	if (input_lines[i,0] == 'output_notes_file'):
@@ -1060,7 +1157,7 @@ if ((number_images > 18) & (number_images <= 32)):
 eazy_positionx, eazy_positiony = 500*sf, 230*sf
 eazytext_positionx, eazytext_positiony = 350*sf, 10*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
-beagletext_positionx, beagletext_positiony = 1110*sf, 70*sf#1300*sf, 70*sf
+beagletext_positionx, beagletext_positiony = 1110*sf, 10*sf#1300*sf, 70*sf
 somz_positionx, somz_positiony = 1490*sf, 350*sf
 
 # Open up the photometric catalog
@@ -1084,13 +1181,14 @@ ID_iterator = 0
 
 if (EAZY_results_file_exists):
 	if (EAZY_results_file.startswith('http')):
-		response = requests.get(EAZY_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password), headers={'Content-Encoding': 'gzip'})
+		response = requests.get(EAZY_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
 		eazy_fits_file = BytesIO(response.content)
 	else:
 		eazy_fits_file = EAZY_results_file
 	eazy_results_fits = fits.open(eazy_fits_file)
 	eazy_results_IDs = eazy_results_fits[1].data['ID'].astype('int')
 	eazy_results_zpeak = eazy_results_fits[1].data['z_peak']
+	eazy_results_za = eazy_results_fits[1].data['z_a']
 	eazy_results_zl68 = eazy_results_fits[1].data['l68']
 	eazy_results_zu68 = eazy_results_fits[1].data['u68']
 	#eazy_results_zl95 = eazy_results_fits[1].data['l95']
@@ -1099,7 +1197,7 @@ if (EAZY_results_file_exists):
 
 if (BEAGLE_results_file_exists):
 	if (BEAGLE_results_file.startswith('http')):
-		response = requests.get(BEAGLE_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password), headers={'Content-Encoding': 'gzip'})
+		response = requests.get(BEAGLE_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
 		beagle_fits_file = BytesIO(response.content)
 	else:
 		beagle_fits_file = BEAGLE_results_file
@@ -1123,7 +1221,7 @@ if (BEAGLE_results_file_exists):
 
 if (NN_results_file_exists):
 	if (NN_results_file.startswith('http')):
-		response = requests.get(NN_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password), headers={'Content-Encoding': 'gzip'})
+		response = requests.get(NN_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
 		NN_fits_file = BytesIO(response.content)
 	else:
 		NN_fits_file = NN_results_file
@@ -1132,8 +1230,20 @@ if (NN_results_file_exists):
 	NN_results_IDs = NN_results_fits[1].data['ID_PHOTOMETRIC'].astype('int')
 	NN_results_zpred = NN_results_fits[1].data['pred_z']
 	NN_results_zspec = NN_results_fits[1].data['true_z']
-		
 
+if (color_selection_results_file_exists):
+	if (color_selection_results_file.startswith('http')):
+		response = requests.get(color_selection_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		color_selection_file = BytesIO(response.content)
+	else:
+		color_selection_file = color_selection_results_file
+
+	color_selection_fits = fits.open(color_selection_file)
+	color_selection_IDs = color_selection_fits[1].data['ID'].astype('int')
+	color_selection_F090W_dropouts = color_selection_fits[1].data['NRC_F090W_Dropout_SNR3.0']
+	color_selection_F115W_dropouts = color_selection_fits[1].data['NRC_F115W_Dropout_SNR3.0']
+	color_selection_F150W_dropouts = color_selection_fits[1].data['NRC_F150W_Dropout_SNR3.0']
+	
 # Decide whether or not the user requested an ID number or an id number list
 if (args.id_number):
 	ID_list = ID_values
@@ -1230,7 +1340,7 @@ Label(root, text="EAZY FIT", fg='black', font=('helvetica', int(textsizevalue*1.
 new_image = getBEAGLEimage(current_id)
 new_photo = resizeimage(new_image)
 item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-#Label(root, text="BEAGLE FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
+Label(root, text="BEAGLE FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
 
 canvas.pack(side = TOP, expand=True, fill=BOTH)
 
@@ -1249,12 +1359,15 @@ redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*
 
 # Make the EAZY redshift label
 if (EAZY_results_file):
-	eazy_z = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
+	eazy_z_peak = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
+	eazy_z_a = getfile_value(current_id, eazy_results_IDs, eazy_results_za, 4)
 	eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
 	eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
 
-	eazy_label = Label(root, text="z_EAZY = "+str(eazy_z)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", font = "Helvetica "+str(textsizevalue), fg="#133e7c", bg="#ffffff")
-	eazy_label.place(x=1100*sf, y = (toprow_y-290.0)*sf)
+	eazy_label_zpeak = Label(root, text="z_EAZY, peak = "+str(eazy_z_peak)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", font = "Helvetica "+str(textsizevalue), fg="#133e7c", bg="#ffffff")
+	eazy_label_zpeak.place(x=1100*sf, y = (toprow_y-290.0)*sf)
+	eazy_label_za = Label(root, text="z_EAZY, a = "+str(eazy_z_a), font = "Helvetica "+str(textsizevalue), fg="#133e7c", bg="#ffffff")
+	eazy_label_za.place(x=1100*sf, y = (toprow_y-250.0)*sf)
 
 
 # Make the BEAGLE redshift labels
@@ -1284,14 +1397,36 @@ if (BEAGLE_results_file):
 
 #NN_z = 5.000
 if (NN_results_file_exists):
-	NN_redshift = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
+	NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
 	NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
-	nn_label = Label(root, text="z_NN = "+str(NN_redshift), font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+	nn_label = Label(root, text="z_NN = "+str(NN_zpred), font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
 	#nn_label.place(x=1800*sf, y = (toprow_y-210.0)*sf)
-	nn_label.place(x=1100*sf, y = (toprow_y-250.0)*sf)
+	nn_label.place(x=1760*sf, y = (toprow_y-290.0)*sf)
 	if (use_zspec == True):
 		nn_label_zspec = Label(root, text="z_spec = "+str(NN_zspec), font = "Helvetica "+str(textsizevalue)+" bold", fg="red", bg="#ffffff")
-		nn_label_zspec.place(x=1760*sf, y = (toprow_y-290.0)*sf)
+		nn_label_zspec.place(x=1760*sf, y = (toprow_y-250.0)*sf)
+
+if (color_selection_results_file_exists):
+	is_F090W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F090W_dropouts)
+	is_F115W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F115W_dropouts)
+	is_F150W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F150W_dropouts)
+	
+	if(is_F090W_dropout):
+		color_selection_label = Label(root, text="F090W Dropout", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+	
+	elif(is_F115W_dropout):
+		color_selection_label = Label(root, text="F115W Dropout", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+
+	elif(is_F150W_dropout):
+		color_selection_label = Label(root, text="F150W Dropout", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+
+	else:
+		color_selection_label = Label(root, text=" ", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+
 
 #SEDz_z = 5.000
 #Label(root, text="z_SEDz = ", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1100*sf, y = (toprow_y-210.0)*sf)
@@ -1356,10 +1491,10 @@ btn4.place(x = 1850*sf, y = (bottomrow_y+10.0)*sf)
 # # # # # # # # # # # #
 # Save Canvas Button
 
+# save_canvas_imagegrab()
 btn4 = Button(root, text = 'Save Canvas', bd = '5', command = save_canvas)  
 btn4.config(height = int(2*sf), width = int(15*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue))
 btn4.place(x = 1645*sf, y = (bottomrow_y+10.0)*sf)
- 
 
 # # # # # # # # # # # #
 # Image Stretch Buttons
@@ -1433,6 +1568,5 @@ btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
 btn11 = Button(root, text = 'SEDz', bd = '5', command = plotsedz)  
 btn11.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
 btn11.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
-
 
 root.mainloop()
