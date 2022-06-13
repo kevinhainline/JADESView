@@ -270,7 +270,9 @@ def nextobject():
 	end_time = time.time()
 	if (timer_verbose):
 		print("Creating the thumbnails: " +str(end_time - start_time))
-	
+		
+	object_label.configure(text="Object "+str(current_id))  
+
 	canvas.delete("separator")
 	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
 	if (EAZY_results_file_exists):
@@ -330,6 +332,8 @@ def previousobject():
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
+
+	object_label.configure(text="Object "+str(current_id))  
 
 	canvas.delete("separator")
 	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
@@ -392,6 +396,8 @@ def gotoobject():
 		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 	
 		fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
+
+		object_label.configure(text="Object "+str(current_id))  
 
 		canvas.delete("separator")
 		redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
@@ -1154,11 +1160,12 @@ if ((number_images > 18) & (number_images <= 32)):
 	thumbnailsize = 1.2*sf
 
 # These do not change depending on the number of images we have.
-eazy_positionx, eazy_positiony = 500*sf, 230*sf
-eazytext_positionx, eazytext_positiony = 350*sf, 10*sf
+eazy_positionx, eazy_positiony = 500*sf, 245*sf
+eazytext_positionx, eazytext_positiony = 820*sf, 10*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
-beagletext_positionx, beagletext_positiony = 1110*sf, 10*sf#1300*sf, 70*sf
+beagletext_positionx, beagletext_positiony = 1780*sf, 10*sf#1300*sf, 70*sf
 somz_positionx, somz_positiony = 1490*sf, 350*sf
+objectID_positionx, objectID_positiony = 20*sf, 10*sf#1300*sf, 70*sf
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)
@@ -1329,18 +1336,23 @@ canvas=Canvas(root, height=canvasheight, width=canvaswidth, bg="#ffffff")
 #image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
 image = getEAZYimage(current_id)
 
+# Put the object label 
+object_label = Label(root, text="Object "+str(current_id), font = "Helvetica "+str(int(textsizevalue*1.5)), fg="black", bg="white")
+object_label.place(x=objectID_positionx, y = objectID_positiony)
+
+
 # Crop out the thumbnails
 image = cropEAZY(image)
 photo = resizeimage(image)
 item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-Label(root, text="EAZY FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
+Label(root, text="EAZY FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
 
 # Plot the BEAGLE SED
 #new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
 new_image = getBEAGLEimage(current_id)
 new_photo = resizeimage(new_image)
 item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-Label(root, text="BEAGLE FIT", fg='black', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
+Label(root, text="BEAGLE FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
 
 canvas.pack(side = TOP, expand=True, fill=BOTH)
 
@@ -1555,9 +1567,9 @@ btn12.place(x = 400*sf, y = (toprow_y-25.0)*sf)
 # Alternate Fits 
 
 # The button to plot the SEDz results
-btn9 = Button(root, text = 'BEAGLE', bd = '5', command = plotbeagle)  
-btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica bold', textsizevalue))
-btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
+#btn9 = Button(root, text = 'BEAGLE', bd = '5', command = plotbeagle)  
+#btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica bold', textsizevalue))
+#btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
 
 # The button to plot the SOMz results
 #btn10 = Button(root, text = 'S3', bd = '5', command = plotsomz)  
@@ -1565,8 +1577,8 @@ btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
 #btn10.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
 
 # The button to plot the SEDz results
-btn11 = Button(root, text = 'SEDz', bd = '5', command = plotsedz)  
-btn11.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-btn11.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
+#btn11 = Button(root, text = 'SEDz', bd = '5', command = plotsedz)  
+#btn11.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+#btn11.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
 
 root.mainloop()
