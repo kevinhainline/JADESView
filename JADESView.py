@@ -174,7 +174,12 @@ def update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg):
 def update_NN_text(current_id, NN_results_IDs, NN_results_zpred):
 
 	NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
-	nn_label.configure(text="z_NN = "+str(NN_zpred))  
+	NN_use = getfile_true_or_false(current_id, NN_results_IDs, NN_results_use)
+	
+	if (NN_use == True):
+		nn_label.configure(text="z_NN = "+str(NN_zpred), fg = 'black')  
+	if (NN_use == False):
+		nn_label.configure(text="z_NN = "+str(NN_zpred)+" (USE = F)", fg = 'grey')  
 
 	if(use_zspec == True):
 		NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
@@ -1237,6 +1242,7 @@ if (NN_results_file_exists):
 	NN_results_IDs = NN_results_fits[1].data['ID_PHOTOMETRIC'].astype('int')
 	NN_results_zpred = NN_results_fits[1].data['pred_z']
 	NN_results_zspec = NN_results_fits[1].data['true_z']
+	NN_results_use = NN_results_fits[1].data['USE']
 
 if (color_selection_results_file_exists):
 	if (color_selection_results_file.startswith('http')):
@@ -1340,7 +1346,6 @@ image = getEAZYimage(current_id)
 object_label = Label(root, text="Object "+str(current_id), font = "Helvetica "+str(int(textsizevalue*1.5)), fg="black", bg="white")
 object_label.place(x=objectID_positionx, y = objectID_positiony)
 
-
 # Crop out the thumbnails
 image = cropEAZY(image)
 photo = resizeimage(image)
@@ -1411,12 +1416,17 @@ if (BEAGLE_results_file):
 if (NN_results_file_exists):
 	NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
 	NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
-	nn_label = Label(root, text="z_NN = "+str(NN_zpred), font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+	NN_use = getfile_true_or_false(current_id, NN_results_IDs, NN_results_use)
+	
+	if (NN_use == True):
+		nn_label = Label(root, text="z_NN = "+str(NN_zpred), font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
+	if (NN_use == False):
+		nn_label = Label(root, text="z_NN = "+str(NN_zpred)+" (USE = F)", font = "Helvetica "+str(textsizevalue), fg="grey", bg="#ffffff")
 	#nn_label.place(x=1800*sf, y = (toprow_y-210.0)*sf)
-	nn_label.place(x=1760*sf, y = (toprow_y-290.0)*sf)
+	nn_label.place(x=1740*sf, y = (toprow_y-290.0)*sf)
 	if (use_zspec == True):
 		nn_label_zspec = Label(root, text="z_spec = "+str(NN_zspec), font = "Helvetica "+str(textsizevalue)+" bold", fg="red", bg="#ffffff")
-		nn_label_zspec.place(x=1760*sf, y = (toprow_y-250.0)*sf)
+		nn_label_zspec.place(x=1740*sf, y = (toprow_y-250.0)*sf)
 
 if (color_selection_results_file_exists):
 	is_F090W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F090W_dropouts)
