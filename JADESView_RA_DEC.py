@@ -46,6 +46,38 @@ ra_dec_size_value = 2.0
 # The default is to not make the crosshair
 make_crosshair = False
 
+def parse_ra_dec(ra_dec_string):
+	
+	ra_dec = ra_dec_string.split(' ')
+	
+	objRA_list = np.array([-9999.0])
+	objDEC_list = np.array([-9999.0])
+
+	if (len(ra_dec) == 6):
+		ra_dec_skycoord = SkyCoord(ra_dec[0]+' '+ra_dec[1]+' '+ra_dec[2]+' '
+				+ra_dec[3]+' '+ra_dec[4]+' '+ra_dec[5], unit=(u.hourangle, u.deg))
+		objRA_list = np.array([ra_dec_skycoord.ra.value])
+		objDEC_list = np.array([ra_dec_skycoord.dec.value])
+	else:
+		if ":" in ra_dec[0]:
+			ra_dec[0] = ra_dec[0].replace(":"," ")
+		
+		if ":" in ra_dec[1]:
+			ra_dec[1] = ra_dec[1].replace(":"," ")
+		
+		if (len(ra_dec[0].split()) == 1):
+			objRA_list = np.array([float(ra_dec[0])])
+			objDEC_list = np.array([float(ra_dec[1])])
+		elif ( (len(ra_dec[0].split()) > 1 ) & (len(ra_dec[0].split()) < 4 )):
+			ra_dec_skycoord = SkyCoord(ra_dec[0].split()[0]+' '+ra_dec[0].split()[1]+' '+ra_dec[0].split()[2]+' '
+				+ra_dec[1].split()[0]+' '+ra_dec[1].split()[1]+' '+ra_dec[0].split()[2], unit=(u.hourangle, u.deg))
+			objRA_list = np.array([ra_dec_skycoord.ra.value])
+			objDEC_list = np.array([ra_dec_skycoord.dec.value])
+		else:
+			objRA_list = np.array([-9999.0])
+			objDEC_list = np.array([-9999.0])
+		
+	return objRA_list, objDEC_list
 
 def resizeimage(image):
 	global baseplotwidth
@@ -160,8 +192,10 @@ def gotoobject():
 	global defaultstretch
 
 	full_ra_dec_string = e1.get()
-	objRA_list[current_ra_dec_index] = float(full_ra_dec_string.split()[0])
-	objDEC_list[current_ra_dec_index] = float(full_ra_dec_string.split()[1])
+	objRA_list, objDEC_list = parse_ra_dec(full_ra_dec_string)
+
+	#objRA_list[current_ra_dec_index] = float(full_ra_dec_string.split()[0])
+	#objDEC_list[current_ra_dec_index] = float(full_ra_dec_string.split()[1])
 
 	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
 
@@ -494,9 +528,10 @@ if ((number_images > 18) & (number_images <= 32)):
 
 if (args.radec_value):
 	ra_dec_string = args.radec_value
-	ra_dec = ra_dec_string.split(' ')
-	objRA_list = np.array([float(ra_dec[0])])
-	objDEC_list = np.array([float(ra_dec[1])])
+	objRA_list, objDEC_list = parse_ra_dec(args.radec_value)
+	#ra_dec = ra_dec_string.split(' ')
+	#objRA_list = np.array([float(ra_dec[0])])
+	#objDEC_list = np.array([float(ra_dec[1])])
 	
 if (args.radec_value_list):
 	fitsinput = fits.open(args.radec_list)
