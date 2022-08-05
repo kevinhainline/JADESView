@@ -127,7 +127,7 @@ def logstretch():
 	defaultstretch = 'LogStretch'
 	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
 
-def asinhstretch():
+def sinhstretch():
 	global sf
 	global textsizevalue
 	global current_ra_dec_index
@@ -144,7 +144,7 @@ def asinhstretch():
 	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
 
-	defaultstretch = 'AsinhStretch'
+	defaultstretch = 'SinhStretch'
 	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
 
 def changeradecsize():
@@ -283,9 +283,9 @@ def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, str
 		# Normalize the image using the min-max interval and a square root stretch
 		thumbnail = image_cutout.data
 		#start_time = time.time()
-		if (stretch == 'AsinhStretch'):
+		if (stretch == 'SinhStretch'):
 			try:
-				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=AsinhStretch())
+				norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=SinhStretch())
 			except IndexError:
 				indexerror = 1
 			except UnboundLocalError:
@@ -304,8 +304,7 @@ def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, str
 				indexerror = 1
 			except UnboundLocalError:
 				indexerror = 1
-		#end_time = time.time()
-		#print("       Stretching Image: " +str(end_time - start_time))
+
 		
 		#start_time = time.time()
 		if (indexerror == 0):
@@ -627,9 +626,9 @@ else:
 btn6.place(x = 250*sf, y = (bottomrow_y+10.0)*sf)
 
 
-# Create the Asinh Button
-btn7 = Button(root, text = 'Asinh', bd = '5', command = asinhstretch)  
-if (defaultstretch == 'AsinhStretch'):
+# Create the Sinh Button
+btn7 = Button(root, text = 'Sinh', bd = '5', command = sinhstretch)  
+if (defaultstretch == 'SinhStretch'):
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
 else:
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
