@@ -46,6 +46,7 @@ ra_dec_size_value = 2.0
 # The default is to not make the crosshair
 make_crosshair = False
 
+# 110.7431250 -73.4758056
 def parse_ra_dec(ra_dec_string):
 	
 	ra_dec = ra_dec_string.split(' ')
@@ -70,7 +71,7 @@ def parse_ra_dec(ra_dec_string):
 			objDEC_list = np.array([float(ra_dec[1])])
 		elif ( (len(ra_dec[0].split()) > 1 ) & (len(ra_dec[0].split()) < 4 )):
 			ra_dec_skycoord = SkyCoord(ra_dec[0].split()[0]+' '+ra_dec[0].split()[1]+' '+ra_dec[0].split()[2]+' '
-				+ra_dec[1].split()[0]+' '+ra_dec[1].split()[1]+' '+ra_dec[0].split()[2], unit=(u.hourangle, u.deg))
+				+ra_dec[1].split()[0]+' '+ra_dec[1].split()[1]+' '+ra_dec[1].split()[2], unit=(u.hourangle, u.deg))
 			objRA_list = np.array([ra_dec_skycoord.ra.value])
 			objDEC_list = np.array([ra_dec_skycoord.dec.value])
 		else:
@@ -329,9 +330,13 @@ def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, str
 		plt.clf()
 		fig = plt.figure(figsize=(thumbnailsize,thumbnailsize))
 		ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
-		ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
-		ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
-
+		try:
+			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
+			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
+		except IndexError:
+			ax3.text(0.51, 0.96, all_images_filter_name[i], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
+			ax3.text(0.5, 0.95, all_images_filter_name[i], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
+			
 		if (make_crosshair == True):
 			ax3.plot([0.5, 0.5], [0.65, 0.8], linewidth=2.0, transform=ax3.transAxes, color = 'white')
 			ax3.plot([0.5, 0.5], [0.2, 0.35], linewidth=2.0, transform=ax3.transAxes, color = 'white')
@@ -369,10 +374,13 @@ def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, str
 
 		
 		#start_time = time.time()
-		if (indexerror == 0):
-			ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
-		else:
-			ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
+		if (all_images_filter_name[i] == 'SEGMAP'):
+			ax3.imshow(thumbnail, origin = 'lower', aspect='equal')		
+		else:		
+			if (indexerror == 0):
+				ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
+			else:
+				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
 		#end_time = time.time()
 		#print("       Plotting Thumbnail: " +str(end_time - start_time))
 			
@@ -545,7 +553,10 @@ for i in range(0, number_images):
 	if (all_image_paths[i] == 'NoImage'):
 		all_image_paths[i] = 'NoImage.fits'
 	image_all = np.append(image_all, fits.open(all_image_paths[i]))
-	image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+	try:
+		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+	except IndexError:
+		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 
 
@@ -663,11 +674,11 @@ btn14.place(x = 600*sf, y = (toprow_y+10.0)*sf)
 
 btn15 = Button(root, text = 'E', bd = '5', command = shift_east)  
 btn15.config(height = int(2*sf), width = int(2*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue))
-btn15.place(x = 540*sf, y = (toprow_y-15.0)*sf)
+btn15.place(x = 540*sf, y = (toprow_y-12.0)*sf)
 
 btn16 = Button(root, text = 'W', bd = '5', command = shift_west)  
 btn16.config(height = int(2*sf), width = int(2*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue))
-btn16.place(x = 660*sf, y = (toprow_y-15.0)*sf)
+btn16.place(x = 660*sf, y = (toprow_y-12.0)*sf)
 
 
 
@@ -689,7 +700,7 @@ btn4.place(x = 700*sf, y = (bottomrow_y+10.0)*sf)
 # # # # # # # # # # # #
 # Image Stretch Buttons
 
-Label(root, text="Stretch", font = ('helvetica', int(20*sf)), fg="#000000", bg='#ffffff').place(x=20*sf, y = (bottomrow_y+ 10.0)*sf)
+Label(root, text="Stretch", font = ('helvetica', int(20*sf)), fg="#000000", bg='#ffffff').place(x=20*sf, y = (bottomrow_y+ 14.0)*sf)
 
 # Create the LinearStretch Button
 btn5 = Button(root, text = 'Linear', bd = '5', command = linearstretch)  
@@ -719,17 +730,17 @@ btn7.place(x = 400*sf, y = (bottomrow_y+10.0)*sf)
 
 
 # Create the RA and DEC size field 
-Label(root, text="RA/DEC size", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=20*sf, y = (toprow_y+15.0)*sf)
-e3 = Entry(root, width = int(10*sf), font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff")
-e3.place(x = 150*sf, y = (toprow_y+10.0)*sf)
+Label(root, text="Box size", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=20*sf, y = (toprow_y+40.0)*sf)
+e3 = Entry(root, width = int(7*sf), font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff")
+e3.place(x = 120*sf, y = (toprow_y+40.0)*sf)
 e3.insert(0, str(ra_dec_size_value))
-Label(root, text="arcseconds", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=280*sf, y = (toprow_y+15.0)*sf)
-btn8 = Button(root, text = 'Change', bd = '5', command = changeradecsize)  
-btn8.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-btn8.place(x = 400*sf, y = (toprow_y+13.0)*sf)
+Label(root, text="arcsec", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=210*sf, y = (toprow_y+42.0)*sf)
+btn8 = Button(root, text = 'Resize', bd = '5', command = changeradecsize)  
+btn8.config(height = 1, width = int(5*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+btn8.place(x = 280*sf, y = (toprow_y+37.0)*sf)
 
 btn12 = Button(root, text = 'Crosshair', bd = '5', command = togglecrosshair)  
 btn12.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-btn12.place(x = 400*sf, y = (toprow_y-25.0)*sf)
+btn12.place(x = 400*sf, y = (toprow_y+37.0)*sf)
 
 root.mainloop()
