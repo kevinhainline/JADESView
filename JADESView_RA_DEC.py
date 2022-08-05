@@ -87,6 +87,68 @@ def resizeimage(image):
 	photo = ImageTk.PhotoImage(image)
 	return photo
 
+def shift_north():
+	global fig_photo_objects
+	global defaultstretch
+	global objRA_list
+	global objDEC_list
+	global ra_dec_size_value
+
+	height = u.Quantity(ra_dec_size_value, u.arcsec)
+	objDEC_list_degree = u.Quantity(objDEC_list[current_ra_dec_index], u.deg)
+	objDEC_list_to_shift = objDEC_list_degree + height/5.0
+	
+	objDEC_list[current_ra_dec_index] = objDEC_list_to_shift.value#objDEC_list[current_ra_dec_index] + 0.00005
+	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	
+def shift_south():
+	global fig_photo_objects
+	global defaultstretch
+	global objRA_list
+	global objDEC_list
+	global ra_dec_size_value
+
+	height = u.Quantity(ra_dec_size_value, u.arcsec)
+	objDEC_list_degree = u.Quantity(objDEC_list[current_ra_dec_index], u.deg)
+	objDEC_list_to_shift = objDEC_list_degree - height/5.0
+	
+	objDEC_list[current_ra_dec_index] = objDEC_list_to_shift.value#objDEC_list[current_ra_dec_index] + 0.00005
+
+	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+
+def shift_east():
+	global fig_photo_objects
+	global defaultstretch
+	global objRA_list
+	global objDEC_list
+	global ra_dec_size_value
+
+	width = u.Quantity(ra_dec_size_value, u.arcsec)
+	objRA_list_degree = u.Quantity(objRA_list[current_ra_dec_index], u.deg)
+	objRA_list_to_shift = objRA_list_degree + width/5.0
+
+	objRA_list[current_ra_dec_index] = objRA_list_to_shift.value#objRA_list[current_ra_dec_index] + 0.0002
+	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+
+def shift_west():
+	global fig_photo_objects
+	global defaultstretch
+	global objRA_list
+	global objDEC_list
+	global ra_dec_size_value
+
+	width = u.Quantity(ra_dec_size_value, u.arcsec)
+	objRA_list_degree = u.Quantity(objRA_list[current_ra_dec_index], u.deg)
+	objRA_list_to_shift = objRA_list_degree - width/5.0
+
+	objRA_list[current_ra_dec_index] = objRA_list_to_shift.value#objRA_list[current_ra_dec_index] + 0.0002
+	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+
+
 def linearstretch():
 	global sf
 	global textsizevalue
@@ -502,7 +564,7 @@ canvaswidth = 930
 if (number_images <= 6):
 	canvasheight = (canvaswidth*(1.0 / 3.0))  # I lock everything to a 2.35:1 aspect ratio
 if ((number_images > 6) & (number_images <= 12)):
-	canvasheight = (canvaswidth*(1.0 / 2.0))  # I lock everything to a 2:1 aspect ratio
+	canvasheight = (canvaswidth*(1.0 / 1.9))  # I lock everything to a 2:1 aspect ratio
 if (number_images > 12):
 	canvasheight = (canvaswidth*(1.0 / 1.5))  # I lock everything to a 1.8:1 aspect ratio
 
@@ -515,11 +577,11 @@ if (number_images <= 6):
 	toprow_y = 230#720
 	bottomrow_y = 300#790
 if ((number_images > 6) & (number_images <= 12)):
-	toprow_y = 400#870
-	bottomrow_y = 470#940
+	toprow_y = 420#870
+	bottomrow_y = 490#940
 if ((number_images > 12) & (number_images <= 18)):
-	toprow_y = 570#1020
-	bottomrow_y = 640#1060
+	toprow_y = 590#1020
+	bottomrow_y = 660#1060
 if ((number_images > 18) & (number_images <= 32)):
 	toprow_y = 740#1020
 	bottomrow_y = 810#1060
@@ -587,6 +649,27 @@ if ((args.radec_value_list is None) & (args.radec_value is not None)):
 	btn9.config(height = int(1*sf), width = int(4*sf), fg='blue', highlightbackground='white', font=('helvetica', textsizevalue))
 	#btn2.pack(side = 'bottom')
 	btn9.place(x = 600*sf, y = (bottomrow_y+9.0)*sf)
+
+# # # # # # # # # # # # # # # # # 
+# Move Up/Down/Left/Right Button
+
+btn13 = Button(root, text = 'N', bd = '5', command = shift_north)  
+btn13.config(height = int(2*sf), width = int(2*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue))
+btn13.place(x = 600*sf, y = (toprow_y-30.0)*sf)
+
+btn14 = Button(root, text = 'S', bd = '5', command = shift_south)  
+btn14.config(height = int(2*sf), width = int(2*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue))
+btn14.place(x = 600*sf, y = (toprow_y+10.0)*sf)
+
+btn15 = Button(root, text = 'E', bd = '5', command = shift_east)  
+btn15.config(height = int(2*sf), width = int(2*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue))
+btn15.place(x = 540*sf, y = (toprow_y-15.0)*sf)
+
+btn16 = Button(root, text = 'W', bd = '5', command = shift_west)  
+btn16.config(height = int(2*sf), width = int(2*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue))
+btn16.place(x = 660*sf, y = (toprow_y-15.0)*sf)
+
+
 
 # # # # # # # # # # # #
 # Quit Button
