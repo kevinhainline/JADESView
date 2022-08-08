@@ -227,8 +227,6 @@ def nextobject():
 	notes_values[current_index] = e2.get()
 	e2.delete(0,END)
 
-	canvas.delete(item4)
-	canvas.delete(item5)
 	if (ID_iterator < len(ID_list)-1):
 		ID_iterator = ID_iterator+1
 #	else:
@@ -240,36 +238,40 @@ def nextobject():
 	e2.insert(0, notes_values[current_index])
 
 	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
-	image = getEAZYimage(current_id)
-	start_time = time.time()
-	image = cropEAZY(image)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Cropping the EAZY image: " +str(end_time - start_time))
-	start_time = time.time()
-	photo = resizeimage(image)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Resizing the EAZY image: " +str(end_time - start_time))
-	start_time = time.time()
-	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Creating the EAZY canvas: " +str(end_time - start_time))
+	if (EAZY_plots_exist == True):
+		canvas.delete(item4)
+		image = getEAZYimage(current_id)
+		start_time = time.time()
+		image = cropEAZY(image)
+		end_time = time.time()
+		if (timer_verbose):
+			print("Cropping the EAZY image: " +str(end_time - start_time))
+		start_time = time.time()
+		photo = resizeimage(image)
+		end_time = time.time()
+		if (timer_verbose):
+			print("Resizing the EAZY image: " +str(end_time - start_time))
+		start_time = time.time()
+		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
+		end_time = time.time()
+		if (timer_verbose):
+			print("Creating the EAZY canvas: " +str(end_time - start_time))
 	
-	#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-	new_image = getBEAGLEimage(current_id)
-	start_time = time.time()
-	new_photo = resizeimage(new_image)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Resizing the BEAGLE image: " +str(end_time - start_time))
-	start_time = time.time()
-	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
-
+	if (BEAGLE_plots_exist == True):
+		canvas.delete(item5)
+		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+		new_image = getBEAGLEimage(current_id)
+		start_time = time.time()
+		new_photo = resizeimage(new_image)
+		end_time = time.time()
+		if (timer_verbose):
+			print("Resizing the BEAGLE image: " +str(end_time - start_time))
+		start_time = time.time()
+		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+		end_time = time.time()
+		if (timer_verbose):
+			print("Creating the BEAGLE canvas: " +str(end_time - start_time))
+	
 	start_time = time.time()
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 	end_time = time.time()
@@ -314,8 +316,6 @@ def previousobject():
 	notes_values[current_index] = e2.get()
 	e2.delete(0,END)
 
-	canvas.delete(item4)
-	canvas.delete(item5)
 	if (ID_iterator > 0):
 		ID_iterator = ID_iterator-1
 	else:
@@ -325,16 +325,20 @@ def previousobject():
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
-	image = getEAZYimage(current_id)
-	image = cropEAZY(image)
-	photo = resizeimage(image)
-	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-	
-	#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-	new_image = getBEAGLEimage(current_id)
-	new_photo = resizeimage(new_image)
-	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+	if (EAZY_plots_exist == True):
+		canvas.delete(item4)
+		#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
+		image = getEAZYimage(current_id)
+		image = cropEAZY(image)
+		photo = resizeimage(image)
+		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
+		
+	if (BEAGLE_plots_exist == True):
+		canvas.delete(item5)
+		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+		new_image = getBEAGLEimage(current_id)
+		new_photo = resizeimage(new_image)
+		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 
 	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 
@@ -379,8 +383,6 @@ def gotoobject():
 	e2.delete(0,END)
 
 	if (e1.get().isdigit() == True):
-		canvas.delete(item4)
-		canvas.delete(item5)
 
 		#current_id = int(e1.get())
 		ID_iterator = np.where(ID_list == int(e1.get()))[0][0]
@@ -390,15 +392,19 @@ def gotoobject():
 		e2.insert(0, notes_values[current_index])
 	
 		#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
-		image = getEAZYimage(current_id)
-		image = cropEAZY(image)
-		photo = resizeimage(image)
-		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
+		if (EAZY_plots_exist == True):
+			canvas.delete(item4)
+			image = getEAZYimage(current_id)
+			image = cropEAZY(image)
+			photo = resizeimage(image)
+			item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 		
-		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-		new_image = getBEAGLEimage(current_id)
-		new_photo = resizeimage(new_image)
-		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+		if (BEAGLE_plots_exist == True):
+			canvas.delete(item5)
+			#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
+			new_image = getBEAGLEimage(current_id)
+			new_photo = resizeimage(new_image)
+			item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 	
 		fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
 
@@ -671,7 +677,7 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 	
 	fig_photo_objects = np.empty(0, dtype = 'object')
 	for i in range(0, number_images):
-		image = image_all[i].data
+		image = image_hdu_all[i].data
 		image_hdu = image_hdu_all[i]
 		image_wcs = image_wcs_all[i]
 				
@@ -692,22 +698,31 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			plt.clf()
 			fig = plt.figure(figsize=(thumbnailsize,thumbnailsize))
 			ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
-			ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
-			ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
+			if (all_images_filter_name[i] == 'SEGMAP'):
+				ax3.text(0.51, 0.96, all_images_filter_name[i], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
+				ax3.text(0.5, 0.95, all_images_filter_name[i], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
+			
+			else:
+				ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
+				ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
 			if (number_images <= 18):
 				if (SNR_values[idx_cat, i] > -100):
-					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
+					if (all_images_filter_name[i] != 'SEGMAP'):
+						ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
+						ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
 				else:
-					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
+					if (all_images_filter_name[i] != 'SEGMAP'):
+						ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
+						ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
 			else:
 				if (SNR_values[idx_cat, i] > -100):
-					ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
+					if (all_images_filter_name[i] != 'SEGMAP'):
+						ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
+						ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
 				else:
-					ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
-					ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
+					if (all_images_filter_name[i] != 'SEGMAP'):
+						ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
+						ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
 			
 			if (make_crosshair == True):
 				ax3.plot([0.5, 0.5], [0.65, 0.8], linewidth=2.0, transform=ax3.transAxes, color = 'white')
@@ -747,7 +762,9 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 			#print("       Stretching Image: " +str(end_time - start_time))
 			
 			#start_time = time.time()
-			if (indexerror == 0):
+			if (all_images_filter_name[i] == 'SEGMAP'):
+				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
+			elif (indexerror == 0):
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
 			else:
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
@@ -1055,7 +1072,9 @@ if (args.tverb):
 canvaswidth = 2000
 
 # I have to set these as false unless the file is specified in the input file
+EAZY_plots_exist = False
 EAZY_results_file_exists = False
+BEAGLE_plots_exist = False
 BEAGLE_results_file_exists = False
 NN_results_file_exists = False
 color_selection_results_file_exists = False
@@ -1070,11 +1089,13 @@ for i in range(0, number_input_lines):
 		all_images_file_name = input_lines[i,1]
 	if (input_lines[i,0] == 'EAZY_files'):
 		EAZY_files = input_lines[i,1]
+		EAZY_plots_exist = True
 	if (input_lines[i,0] == 'EAZY_results'):
 		EAZY_results_file = input_lines[i,1]
 		EAZY_results_file_exists = True
 	if (input_lines[i,0] == 'BEAGLE_files'):
 		BEAGLE_files = input_lines[i,1]
+		BEAGLE_plots_exist = True
 	if (input_lines[i,0] == 'BEAGLE_results'):
 		BEAGLE_results_file = input_lines[i,1]
 		BEAGLE_results_file_exists = True
@@ -1123,7 +1144,10 @@ for i in range(0, number_images):
 	if (all_image_paths[i] == 'NoImage'):
 		all_image_paths[i] = 'NoImage.fits'
 	image_all = np.append(image_all, fits.open(all_image_paths[i]))
-	image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[0])
+	try:
+		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+	except IndexError:
+		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 
 
@@ -1184,9 +1208,13 @@ image_flux_value_err_cat = np.zeros([number_objects, number_image_filters])
 SNR_values = np.zeros([number_objects, number_image_filters])
 
 for j in range(0, number_image_filters):
-	image_flux_value_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]]
-	image_flux_value_err_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]+'_err']
-	SNR_values[:,j] = image_flux_value_cat[:,j] / image_flux_value_err_cat[:,j]
+	if (all_images_filter_name[j] == 'SEGMAP'):
+		SNR_values[:,j] = -9999
+		
+	else:
+		image_flux_value_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]]
+		image_flux_value_err_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]+'_err']
+		SNR_values[:,j] = image_flux_value_cat[:,j] / image_flux_value_err_cat[:,j]
 
 number_input_objects = len(ID_values)
 ID_iterator = 0
@@ -1347,17 +1375,19 @@ object_label = Label(root, text="Object "+str(current_id), font = "Helvetica "+s
 object_label.place(x=objectID_positionx, y = objectID_positiony)
 
 # Crop out the thumbnails
-image = cropEAZY(image)
-photo = resizeimage(image)
-item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-Label(root, text="EAZY FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
+if (EAZY_plots_exist == True):
+	image = cropEAZY(image)
+	photo = resizeimage(image)
+	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
+	Label(root, text="EAZY FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
 
 # Plot the BEAGLE SED
 #new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-new_image = getBEAGLEimage(current_id)
-new_photo = resizeimage(new_image)
-item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-Label(root, text="BEAGLE FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
+if (BEAGLE_plots_exist == True):
+	new_image = getBEAGLEimage(current_id)
+	new_photo = resizeimage(new_image)
+	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
+	Label(root, text="BEAGLE FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
 
 canvas.pack(side = TOP, expand=True, fill=BOTH)
 
@@ -1375,7 +1405,7 @@ redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*
 
 
 # Make the EAZY redshift label
-if (EAZY_results_file):
+if (EAZY_results_file_exists == True):
 	eazy_z_peak = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
 	eazy_z_a = getfile_value(current_id, eazy_results_IDs, eazy_results_za, 4)
 	eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
@@ -1388,7 +1418,7 @@ if (EAZY_results_file):
 
 
 # Make the BEAGLE redshift labels
-if (BEAGLE_results_file):
+if (BEAGLE_results_file_exists == True):
 	beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
 	beagle_z_l68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zl68, 4)
 	beagle_z_u68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zu68, 4)
