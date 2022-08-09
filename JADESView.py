@@ -97,6 +97,23 @@ def getSEDzimage(ID):
 
 	return image
 
+def getBAGPIPESimage(ID):
+	start_time = time.time()
+	bagpipes_file_name_individual = '{:05d}.png'.format(ID-1)
+	bagpipes_file_name = BAGPIPES_files+bagpipes_file_name_individual
+
+	if (bagpipes_file_name.startswith('http')):
+		response = requests.get(bagpipes_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		image = Image.open(BytesIO(response.content))
+	else:
+		image = Image.open(bagpipes_file_name)
+		
+	end_time = time.time()
+	if (timer_verbose):
+		print("Fetching the BAGPIPES image: " +str(end_time - start_time))
+
+	return image
+
 def resizeimage(image):
 	global baseplotwidth
 	wpercent = (baseplotwidth / float(image.size[0]))
@@ -105,11 +122,11 @@ def resizeimage(image):
 	photo = ImageTk.PhotoImage(image)
 	return photo
 
-def resizeSOMzimage(image):
-	global SOMzbaseplotwidth
-	wpercent = (SOMzbaseplotwidth / float(image.size[0]))
+def resizeBAGPIPESimage(image):
+	global BAGPIPESbaseplotwidth
+	wpercent = (BAGPIPESbaseplotwidth / float(image.size[0]))
 	hsize = int((float(image.size[1]) * float(wpercent)))
-	image = image.resize((SOMzbaseplotwidth, hsize), PIL.Image.ANTIALIAS)
+	image = image.resize((BAGPIPESbaseplotwidth, hsize), PIL.Image.ANTIALIAS)
 	photo = ImageTk.PhotoImage(image)
 	return photo
 
@@ -198,8 +215,10 @@ def update_color_selection_text(current_id, color_selection_results_IDs, color_s
 		color_selection_label.configure(text="F150W Dropout")  
 	else:
 		color_selection_label.configure(text=" ")  
-		
-
+	
+def update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot):
+	BAGPIPES_zpred = getfile_value(current_id-1, BAGPIPES_results_IDs, BAGPIPES_results_zphot, 4)
+	bagpipes_label.configure(text="z_BAGPIPES = "+str(BAGPIPES_zpred))
 		
 
 def nextobject():
@@ -232,6 +251,13 @@ def nextobject():
 #	else:
 #		len(ID_list)-1
 #		save_destroy()
+	
+	if (item4 is not None):
+		canvas.delete(item4)
+
+	if (item5 is not None):
+		canvas.delete(item5)
+
 		
 	current_index = ID_list_indices[ID_iterator]
 	current_id = ID_list[ID_iterator]
@@ -239,7 +265,6 @@ def nextobject():
 
 	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
 	if (EAZY_plots_exist == True):
-		canvas.delete(item4)
 		image = getEAZYimage(current_id)
 		start_time = time.time()
 		image = cropEAZY(image)
@@ -258,7 +283,6 @@ def nextobject():
 			print("Creating the EAZY canvas: " +str(end_time - start_time))
 	
 	if (BEAGLE_plots_exist == True):
-		canvas.delete(item5)
 		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
 		new_image = getBEAGLEimage(current_id)
 		start_time = time.time()
@@ -290,6 +314,9 @@ def nextobject():
 		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
 	if (color_selection_results_file_exists):
 		update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
+	if (BAGPIPES_results_file_exists):
+		update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot)
+
 
 def previousobject():
 	global ID_iterator
@@ -354,6 +381,8 @@ def previousobject():
 		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
 	if (color_selection_results_file_exists):
 		update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
+	if (BAGPIPES_results_file_exists):
+		update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot)
 
 
 def gotoobject():
@@ -420,6 +449,8 @@ def gotoobject():
 			update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
 		if (color_selection_results_file_exists):
 			update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
+		if (BAGPIPES_results_file_exists):
+			update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot)
 
 	else:
 		print("That's not a valid ID number.")
@@ -452,6 +483,14 @@ def cropEAZY(img):
 	output_image = img.crop((0, 0, 3300, 1480))
 
 	return output_image
+
+# This will remove the thumbnails, for future work
+def cropBAGPIPES(img):
+
+	#output_image = img.crop((0, 0, 3300, 1600))
+	output_bagpipes_image = img.crop((0, 375, 1915, 1554))
+
+	return output_bagpipes_image
 
 def linearstretch():
 	global sf
@@ -586,6 +625,9 @@ def save_canvas():
 			ax9.text(0.98, 0.1, "F115W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
 		elif (is_F150W_dropout):
 			ax9.text(0.98, 0.1, "F150W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
+	if (BAGPIPES_results_file_exists):
+		BAGPIPES_zpred = getfile_value(current_id-1, BAGPIPES_results_IDs, BAGPIPES_results_zphot, 4)
+		ax9.text(0.98, 0.3, "z_BAGPIPES = "+str(BAGPIPES_zpred), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = '#091833')		
 
 
 	fig2_x = 950
@@ -901,7 +943,7 @@ def plotbeagle():
 	btn11.config(font=('helvetica', textsizevalue))
 	
 	
-def plotsomz():
+def plotbagpipes():
 	global e2
 	global ID_iterator
 	global current_index
@@ -915,31 +957,30 @@ def plotsomz():
 	global fig_photo_objects
 	global defaultstretch
 
-	global eazy_positionx, eazy_positiony
-	global eazytext_positionx, eazytext_positiony
-	global beagle_positionx, beagle_positiony
-	global beagletext_positionx, beagletext_positiony
+	global bagpipes_positionx, bagpipes_positiony
 
 	notes_values[current_index] = e2.get()
 	e2.delete(0,END)
 
-	canvas.delete(item5)
+	if (item5 is not None):
+		canvas.delete(item5)
 		
 	current_index = ID_list_indices[ID_iterator]
 	current_id = ID_list[ID_iterator]
 	e2.insert(0, notes_values[current_index])
 
-	new_image = getSOMzimage(current_id)
+	new_image = getBAGPIPESimage(current_id)
+	new_image = cropBAGPIPES(new_image)
 	start_time = time.time()
-	new_photo = resizeSOMzimage(new_image)
+	new_photo = resizeBAGPIPESimage(new_image)
 	end_time = time.time()
 	if (timer_verbose):
-		print("Resizing the SOMz image: " +str(end_time - start_time))
+		print("Resizing the BAGPIPES image: " +str(end_time - start_time))
 	start_time = time.time()
-	item5 = canvas.create_image(somz_positionx, somz_positiony, image=new_photo)
+	item5 = canvas.create_image(bagpipes_positionx, bagpipes_positiony, image=new_photo)
 	end_time = time.time()
 	if (timer_verbose):
-		print("Creating the SOMz canvas: " +str(end_time - start_time))
+		print("Creating the BAGPIPES canvas: " +str(end_time - start_time))
 
 def plotsedz():
 	global e2
@@ -1076,6 +1117,8 @@ EAZY_plots_exist = False
 EAZY_results_file_exists = False
 BEAGLE_plots_exist = False
 BEAGLE_results_file_exists = False
+BAGPIPES_plots_exist = False
+BAGPIPES_results_file_exists = False
 NN_results_file_exists = False
 color_selection_results_file_exists = False
 
@@ -1099,8 +1142,12 @@ for i in range(0, number_input_lines):
 	if (input_lines[i,0] == 'BEAGLE_results'):
 		BEAGLE_results_file = input_lines[i,1]
 		BEAGLE_results_file_exists = True
-	if (input_lines[i,0] == 'SOMz_files'):
-		SOMz_files = input_lines[i,1]
+	if (input_lines[i,0] == 'BAGPIPES_files'):
+		BAGPIPES_files = input_lines[i,1]
+		BAGPIPES_plots_exist = True
+	if (input_lines[i,0] == 'BAGPIPES_results'):
+		BAGPIPES_results_file = input_lines[i,1]
+		BAGPIPES_results_file_exists = True
 	if (input_lines[i,0] == 'SEDz_files'):
 		SEDz_files = input_lines[i,1]
 	if (input_lines[i,0] == 'NN_results'):
@@ -1168,7 +1215,7 @@ if (number_images > 12):
 	canvasheight = (canvaswidth*(1.0 / 1.8))  # I lock everything to a 1.8:1 aspect ratio
 
 baseplotwidth = int(1000*sf)
-SOMzbaseplotwidth = int(800*sf)
+BAGPIPESbaseplotwidth = int(800*sf)
 textsizevalue = int(20*sf)
 thumbnailsize = 1.5*sf
 
@@ -1193,7 +1240,7 @@ eazy_positionx, eazy_positiony = 500*sf, 245*sf
 eazytext_positionx, eazytext_positiony = 820*sf, 10*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
 beagletext_positionx, beagletext_positiony = 1780*sf, 10*sf#1300*sf, 70*sf
-somz_positionx, somz_positiony = 1490*sf, 350*sf
+bagpipes_positionx, bagpipes_positiony = 1490*sf, 275*sf
 objectID_positionx, objectID_positiony = 20*sf, 10*sf#1300*sf, 70*sf
 
 # Open up the photometric catalog
@@ -1284,6 +1331,18 @@ if (color_selection_results_file_exists):
 	color_selection_F090W_dropouts = color_selection_fits[1].data['NRC_F090W_Dropout_SNR3.0']
 	color_selection_F115W_dropouts = color_selection_fits[1].data['NRC_F115W_Dropout_SNR3.0']
 	color_selection_F150W_dropouts = color_selection_fits[1].data['NRC_F150W_Dropout_SNR3.0']
+
+if (BAGPIPES_results_file_exists):
+	if (BAGPIPES_results_file.startswith('http')):
+		response = requests.get(BAGPIPES_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
+		BAGPIPES_fits_file = BytesIO(response.content)
+	else:
+		BAGPIPES_fits_file = BAGPIPES_results_file
+
+	BAGPIPES_results_fits = fits.open(BAGPIPES_fits_file)
+	BAGPIPES_results_IDs = BAGPIPES_results_fits[1].data['ID'].astype('int')
+	BAGPIPES_results_zphot = BAGPIPES_results_fits[1].data['redshift_mean']
+
 	
 # Decide whether or not the user requested an ID number or an id number list
 if (args.id_number):
@@ -1380,6 +1439,8 @@ if (EAZY_plots_exist == True):
 	photo = resizeimage(image)
 	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
 	Label(root, text="EAZY FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
+else:
+	item4 = None
 
 # Plot the BEAGLE SED
 #new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
@@ -1388,6 +1449,8 @@ if (BEAGLE_plots_exist == True):
 	new_photo = resizeimage(new_image)
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
 	Label(root, text="BEAGLE FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
+else:
+	item5 = None
 
 canvas.pack(side = TOP, expand=True, fill=BOTH)
 
@@ -1478,6 +1541,12 @@ if (color_selection_results_file_exists):
 	else:
 		color_selection_label = Label(root, text=" ", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
 		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+
+if (BAGPIPES_results_file_exists):
+	BAGPIPES_zpred = getfile_value(current_id-1, BAGPIPES_results_IDs, BAGPIPES_results_zphot, 4)
+
+	bagpipes_label = Label(root, text="z_BAGPIPES = "+str(BAGPIPES_zpred), font = "Helvetica "+str(textsizevalue), fg="grey", bg="#ffffff")
+	bagpipes_label.place(x=1740*sf, y = (toprow_y-150.0)*sf)
 
 
 #SEDz_z = 5.000
@@ -1611,10 +1680,11 @@ btn12.place(x = 400*sf, y = (toprow_y-25.0)*sf)
 #btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica bold', textsizevalue))
 #btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
 
-# The button to plot the SOMz results
-#btn10 = Button(root, text = 'S3', bd = '5', command = plotsomz)  
-#btn10.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-#btn10.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
+# The button to plot the BAGPIPES results
+if (BAGPIPES_plots_exist == True):
+	btn10 = Button(root, text = 'BAGPIPES', bd = '5', command = plotbagpipes)  
+	btn10.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
+	btn10.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
 
 # The button to plot the SEDz results
 #btn11 = Button(root, text = 'SEDz', bd = '5', command = plotsedz)  
