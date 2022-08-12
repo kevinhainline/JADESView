@@ -346,7 +346,7 @@ def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, str
 		# Set the color map
 		plt.set_cmap('gray')
 			
-		indexerror = 0		
+		indexerror = 0
 		# Normalize the image using the min-max interval and a square root stretch
 		thumbnail = image_cutout.data
 		#start_time = time.time()

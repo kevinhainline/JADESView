@@ -1206,30 +1206,18 @@ sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canva
 # The fontsize depends on this
 fontsize = str(int(20*sf))
 
-# We use the number of images we have to to set the canvasheight
-if (number_images <= 6):
-	canvasheight = (canvaswidth*(1.0 / 2.35))  # I lock everything to a 2.35:1 aspect ratio
-if ((number_images > 6) & (number_images <= 12)):
-	canvasheight = (canvaswidth*(1.0 / 2.0))  # I lock everything to a 2:1 aspect ratio
-if (number_images > 12):
-	canvasheight = (canvaswidth*(1.0 / 1.8))  # I lock everything to a 1.8:1 aspect ratio
+canvasheight = (canvaswidth*(1.0 / 1.8))  # For showing the various results on the figure, 
+										   # I lock everything to a 1.8:1 aspect ratio
 
 baseplotwidth = int(1000*sf)
 BAGPIPESbaseplotwidth = int(800*sf)
 textsizevalue = int(20*sf)
 thumbnailsize = 1.5*sf
 
-# We have a few rows of buttons at the bottom of the canvas, and their exact
-# positions depend on the number of images. 
-if (number_images <= 6):
-	toprow_y = 720
-	bottomrow_y = 790
-if ((number_images > 6) & (number_images <= 12)):
-	toprow_y = 870
-	bottomrow_y = 940
-if ((number_images > 12) & (number_images <= 18)):
-	toprow_y = 1020
-	bottomrow_y = 1060
+toprow_y = 1020
+bottomrow_y = 1060
+
+# However, if we get a lot of thumbnails, I might want to change things a bit
 if ((number_images > 18) & (number_images <= 32)):
 	toprow_y = 1020
 	bottomrow_y = 1060
