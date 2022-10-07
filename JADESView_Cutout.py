@@ -13,7 +13,7 @@ from requests.auth import HTTPBasicAuth
 from io import BytesIO
 import numpy as np
 import matplotlib
-matplotlib.use("TkAgg")
+#matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.io import ascii
@@ -26,16 +26,16 @@ from astropy.wcs import WCS
 
 from astropy.visualization import (MinMaxInterval, ZScaleInterval, LogStretch, ImageNormalize, AsinhStretch, SinhStretch, LinearStretch)
 
-import matplotlib.backends.tkagg as tkagg
-from matplotlib.backends.backend_agg import FigureCanvasAgg
+#import matplotlib.backends.tkagg as tkagg
+#from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 #from Tkinter import *
-try:
-    from Tkinter import *
-except ImportError:
-    from tkinter import *
-import PIL
-from PIL import ImageTk, Image, ImageGrab
+#try:
+#    from Tkinter import *
+#except ImportError:
+#    from tkinter import *
+#import PIL
+#from PIL import ImageTk, Image, ImageGrab
 
 JADESView_input_file = 'JADESView_input_file.dat'
 
@@ -293,10 +293,21 @@ if (args.radec_value):
 	#objDEC_list = np.array([float(ra_dec[1])])
 	
 if (args.radec_value_list):
-	fitsinput = fits.open(args.radec_list)
+	if (args.radec_value_list.endswith('.fits')):
+		fitsinput = fits.open(args.radec_list)
+	
+		objRA_list = fitsinput[1].data['RA']
+		objDEC_list = fitsinput[1].data['DEC']
+	else:
+		radec_value_list_txt = np.loadtxt(args.radec_value_list, dtype = 'str')
+		
+		objRA_list_raw = radec_value_list_txt[:,0]
+		objDEC_list_raw = radec_value_list_txt[:,1]
 
-	objRA_list = fitsinput[1].data['RA']
-	objDEC_list = fitsinput[1].data['DEC']
+		objRA_list = np.zeros(len(objRA_list_raw))
+		objDEC_list = np.zeros(len(objRA_list_raw))
+		for i in range(0, len(objRA_list_raw)):
+			objRA_list[i], objDEC_list[i] = parse_ra_dec(objRA_list_raw[i]+' '+objDEC_list_raw[i])
 
 number_ra_dec_list = len(objRA_list)
 current_ra_dec_index = 0
@@ -304,6 +315,8 @@ current_ra_dec_index = 0
 make_crosshair = False
 
 stretch = defaultstretch
+
+print(dope)
 
 for obj in range(0, number_ra_dec_list):
 
@@ -314,7 +327,7 @@ for obj in range(0, number_ra_dec_list):
 
 	if (not os.path.exists(obj_output_file_name+'/')):
 		os.makedirs(obj_output_file_name+'/')
-		os.makedirs(obj_output_file_name+'/fits/')
+		#os.makedirs(obj_output_file_name+'/fits/')
 
 	cosdec_center = math.cos(objDEC * 3.141593 / 180.0)
 	
@@ -344,7 +357,7 @@ for obj in range(0, number_ra_dec_list):
 		image_hdu = image_hdu_all[i]
 		image_wcs = image_wcs_all[i]
 		
-		hdu_cutout = image_hdu_all[i]
+		#hdu_cutout = image_hdu
 		
 		row_position = (number_rows + 1) - (np.floor((i)/6)+1)
 		col_position = ((i)%6)+1
@@ -491,15 +504,17 @@ for obj in range(0, number_ra_dec_list):
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
 
 		fig2.savefig(obj_output_file_name+'/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.png', dpi = 300)
-
+		plt.close(fig2)
+		
 		# And now, let's save the fits file
 		
-		hdu_cutout.data = image_cutout.data
-		hdu_cutout.header.update(image_cutout.wcs.to_header())
-		hdu_cutout.writeto(obj_output_file_name+'/fits/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.fits')
+		#hdu_cutout.data = image_cutout.data
+		#hdu_cutout.header.update(image_cutout.wcs.to_header())
+		#hdu_cutout.writeto(obj_output_file_name+'/fits/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.fits', overwrite = True)
 
 	fig.savefig(obj_output_file_name+'/'+obj_output_file_name+'_All_Filters.png', dpi = 300)
-
+	plt.close(fig)
+	
 	# Create the tarfile
 	if (args.create_tarball):
 		tar = tarfile.open(obj_output_file_name+".tar.gz", "w:gz")
