@@ -316,8 +316,6 @@ make_crosshair = False
 
 stretch = defaultstretch
 
-print(dope)
-
 for obj in range(0, number_ra_dec_list):
 
 	objRA = objRA_list[obj]
