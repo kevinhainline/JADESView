@@ -5,6 +5,7 @@ import ast
 import sys
 import math
 import time 
+import scipy
 import argparse
 import requests
 from requests.auth import HTTPBasicAuth
@@ -46,6 +47,23 @@ ra_dec_size_value = 2.0
 # The default is to not make the crosshair
 make_crosshair = False
 
+def print_nearest_objects(ID_values, catalog_ra, catalog_dec, ra_value, dec_value, distance):
+	c = SkyCoord(ra=catalog_ra*u.degree, dec=catalog_dec*u.degree)
+	object_ra_dec = SkyCoord(ra=ra_value*u.degree, dec=dec_value*u.degree)
+	close_objects = np.where(object_ra_dec.separation(c) < distance*u.arcsec)
+	
+	print("------------------------------------------------------------------------------------------")
+	if (len(close_objects[0]) < 1):
+		print("There are no objects within "+str(distance)+" arcseconds of the position.")
+	if (len(close_objects[0]) == 1):
+		print("This object is within "+str(distance)+" arcseconds of the position RA = "+str(round(ra_value,6))+", DEC = "+str(round(dec_value,6))+":")
+		print("       "+str(ID_values[close_objects[0]][0])+", RA = "+str(catalog_ra[close_objects[0]][0])+", DEC = "+str(catalog_dec[close_objects[0]][0])+", distance = "+str(round(object_ra_dec.separation(c)[close_objects[0][0]].arcsec,3))+" arcsec")
+	if (len(close_objects[0]) > 1):
+		print("These objects are within "+str(distance)+" arcseconds of the position RA = "+str(round(ra_value,6))+", DEC = "+str(round(dec_value,6))+":")
+		for q in range(0, len(close_objects[0])):
+			print("       "+str(ID_values[close_objects[0]][q])+", RA = "+str(catalog_ra[close_objects[0]][q])+", DEC = "+str(catalog_dec[close_objects[0]][q])+", distance = "+str(round(object_ra_dec.separation(c)[close_objects[0][q]].arcsec,3))+" arcsec")
+	print("------------------------------------------------------------------------------------------")
+
 # 110.7431250 -73.4758056
 def parse_ra_dec(ra_dec_string):
 	
@@ -80,6 +98,23 @@ def parse_ra_dec(ra_dec_string):
 		
 	return objRA_list, objDEC_list
 
+def findthumbnailradec(ra_value, dec_value, ra_dec_size_value, id_cat, ra_cat, dec_cat):
+	#print(ra_value, dec_value, ra_dec_size_value)
+	c = SkyCoord(ra=ra_cat*u.degree, dec=dec_cat*u.degree)
+	center_of_box = SkyCoord(ra=ra_value*u.degree, dec=dec_value*u.degree)
+	d2d = c.separation(center_of_box)
+	#idx, d2d, d3d = center_of_box.match_to_catalog_sky(c)
+
+	#214.8405342 52.8179497 10.0
+
+	objects_in_box = np.where(d2d.arcsec < ra_dec_size_value)[0]
+
+	if (len(objects_in_box) > 0):
+		return id_cat[objects_in_box], ra_cat[objects_in_box], dec_cat[objects_in_box]
+	else:
+		return np.array([-9999]), np.array([-9999]), np.array([-9999])
+	
+
 def resizeimage(image):
 	global baseplotwidth
 	wpercent = (baseplotwidth / float(image.size[0]))
@@ -101,7 +136,7 @@ def shift_north():
 	
 	objDEC_list[current_ra_dec_index] = objDEC_list_to_shift.value#objDEC_list[current_ra_dec_index] + 0.00005
 	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 	
 def shift_south():
 	global fig_photo_objects
@@ -117,7 +152,7 @@ def shift_south():
 	objDEC_list[current_ra_dec_index] = objDEC_list_to_shift.value#objDEC_list[current_ra_dec_index] + 0.00005
 
 	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 def shift_east():
 	global fig_photo_objects
@@ -132,7 +167,7 @@ def shift_east():
 
 	objRA_list[current_ra_dec_index] = objRA_list_to_shift.value#objRA_list[current_ra_dec_index] + 0.0002
 	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 def shift_west():
 	global fig_photo_objects
@@ -147,7 +182,7 @@ def shift_west():
 
 	objRA_list[current_ra_dec_index] = objRA_list_to_shift.value#objRA_list[current_ra_dec_index] + 0.0002
 	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 
 def linearstretch():
@@ -168,7 +203,7 @@ def linearstretch():
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 
 	defaultstretch = 'LinearStretch'	
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 def logstretch():
 	global sf
@@ -188,7 +223,7 @@ def logstretch():
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
 
 	defaultstretch = 'LogStretch'
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 def sinhstretch():
 	global sf
@@ -208,7 +243,7 @@ def sinhstretch():
 	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
 
 	defaultstretch = 'SinhStretch'
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 def changeradecsize():
 	global current_ra_dec_index
@@ -221,7 +256,7 @@ def changeradecsize():
 	global e3
 
 	ra_dec_size_value = float(e3.get())
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 def togglecrosshair():
 	global current_ra_dec_index
@@ -242,7 +277,7 @@ def togglecrosshair():
 		make_crosshair = False
 		btn12.config(font=('helvetica', textsizevalue))
 		
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 def gotoobject():
 
@@ -262,7 +297,7 @@ def gotoobject():
 
 	radec_label.configure(text="RA = "+str(np.round(objRA_list[current_ra_dec_index],6))+", DEC = "+str(np.round(objDEC_list[current_ra_dec_index],6)))
 
-	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+	fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 
 def draw_figure(canvas, figure, loc=(0, 0)):
@@ -287,7 +322,7 @@ def draw_figure(canvas, figure, loc=(0, 0)):
     # which must be kept live or else the picture disappears
     return photo
 
-def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, stretch):
+def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, stretch, id_cat, ra_cat, dec_cat):
 	#global ID_values
 	global thumbnailsize
 	global ra_dec_size_value
@@ -306,7 +341,9 @@ def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, str
 	objDEC = dec_value
 			
 	cosdec_center = math.cos(objDEC * 3.141593 / 180.0)
-		
+	
+	print_nearest_objects(id_cat, ra_cat, dec_cat, objRA, objDEC, ra_dec_size_value/2.0)
+	
 	# Set the position of the object
 	position = SkyCoord(str(objRA)+'d '+str(objDEC)+'d', frame='fk5')
 	size = u.Quantity((ra_dec_size_value, ra_dec_size_value), u.arcsec)
@@ -342,6 +379,13 @@ def create_thumbnails_ra_dec(canvas, fig_photo_objects, ra_value, dec_value, str
 			ax3.plot([0.5, 0.5], [0.2, 0.35], linewidth=2.0, transform=ax3.transAxes, color = 'white')
 			ax3.plot([0.2, 0.35], [0.5, 0.5], linewidth=2.0, transform=ax3.transAxes, color = 'white')
 			ax3.plot([0.65, 0.8], [0.5, 0.5], linewidth=2.0, transform=ax3.transAxes, color = 'white')
+		
+		# Print the catalog ID objects (can't get it to work just now)
+		#if (i == 0):
+		#	thumbnail_ids, thumbnail_ras, thumbnail_decs = findthumbnailradec(ra_value, dec_value, ra_dec_size_value, id_cat, ra_cat, dec_cat)
+		#	if (thumbnail_ras[0] != -9999):
+		#		ax3.scatter(thumbnail_ras, thumbnail_decs, color = 'white')
+		#		#print (thumbnail_ras, thumbnail_decs)
 						
 		# Set the color map
 		plt.set_cmap('gray')
@@ -522,6 +566,8 @@ canvaswidth = 2000
 input_lines = np.loadtxt(JADESView_input_file, dtype='str')
 number_input_lines = len(input_lines[:,0])
 for i in range(0, number_input_lines):
+	if (input_lines[i,0] == 'input_photometry'):
+		input_photometry = input_lines[i,1]
 	if (input_lines[i,0] == 'image_list'):
 		all_images_file_name = input_lines[i,1]
 	if (input_lines[i,0] == 'canvaswidth'):
@@ -538,25 +584,58 @@ for i in range(0, number_input_lines):
 # # # # # # # # # # # # # # # # # # 
 # Let's open up all the input files
 
+# Open up the photometric catalog
+fitsinput = fits.open(input_photometry)
+ID_values = fitsinput[1].data['ID'].astype('int')
+RA_values = fitsinput[1].data['RA']
+DEC_values = fitsinput[1].data['DEC']
+number_objects = len(ID_values)
+
 # Open up the image list file
 images_all_txt = np.loadtxt(all_images_file_name, dtype='str')
-all_images_filter_name = images_all_txt[:,0]
-all_image_paths = images_all_txt[:,1]
+#all_images_filter_name = images_all_txt[:,0]
+#all_image_paths = images_all_txt[:,1]
+if (len(images_all_txt[0]) > 2):
+	# First, if the user specifies where the science data extension is, they'll put 
+	# them in the second column.
+	all_images_filter_name = images_all_txt[:,0]
+	all_image_extension_number = images_all_txt[:,1].astype('int')
+	all_image_paths = images_all_txt[:,2]
+else:
+	# Here, we assume that the science extension is 1 
+	all_images_filter_name = images_all_txt[:,0]
+	all_image_extension_number = np.zeros(len(all_images_filter_name))+1
+	all_image_paths = images_all_txt[:,1]
 number_image_filters = len(all_images_filter_name)
 number_images = len(all_image_paths)
+
 
 image_all = np.empty(0)
 image_hdu_all = np.empty(0)
 image_wcs_all = np.empty(0)
+#for i in range(0, number_images):
+#	#print "Opening up image: "+all_image_paths[i]
+#	if (all_image_paths[i] == 'NoImage'):
+#		all_image_paths[i] = 'NoImage.fits'
+#	image_all = np.append(image_all, fits.open(all_image_paths[i]))
+#	try:
+#		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+#	except IndexError:
+#		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
+#	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 for i in range(0, number_images):
-	#print "Opening up image: "+all_image_paths[i]
+	print("Opening up image: "+all_image_paths[i])
 	if (all_image_paths[i] == 'NoImage'):
 		all_image_paths[i] = 'NoImage.fits'
 	image_all = np.append(image_all, fits.open(all_image_paths[i]))
 	try:
-		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+		#image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[all_image_extension_number[i]])
 	except IndexError:
+		print('IndexError')
 		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
+		#print('Running fits.open('+str(all_image_paths[i])+')')
+	#print('Running WCS(image_hdu_all[i].header)')
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 
 
@@ -615,7 +694,6 @@ number_ra_dec_list = len(objRA_list)
 current_ra_dec_index = 0
 
 
-
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Now, everything is set up, so let's start creating the GUI
 
@@ -630,7 +708,7 @@ canvas.pack(side = TOP, expand=True, fill=BOTH)
 
 # Plot the thumbnails
 fig_photo_objects = np.empty(0, dtype = 'object')
-fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch)
+fig_photo_objects = create_thumbnails_ra_dec(canvas, fig_photo_objects, objRA_list[current_ra_dec_index], objDEC_list[current_ra_dec_index], defaultstretch, ID_values, RA_values, DEC_values)
 
 # # # # # # # # # # # #
 # Move to New Object Buttons

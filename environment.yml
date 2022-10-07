@@ -2,6 +2,7 @@ name: jadesview
 dependencies:
   - python=3.9
   - numpy
+  - scipy
   - astropy
   - requests
   - conda-forge::matplotlib=2.2.5

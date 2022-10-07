@@ -723,11 +723,12 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 		image_hdu = image_hdu_all[i]
 		image_wcs = image_wcs_all[i]
 				
-		if (all_images_filter_name[i] == 'HST_F814W'):
-			image_wcs.sip = None
+#		if (all_images_filter_name[i] == 'HST_F814W'):
+#			image_wcs.sip = None
 		
 		if (image_flux_value_err_cat[idx_cat, i] > -9999):
 			# Make the cutout
+			#print(all_images_filter_name[i])
 			start_time = time.time()
 			image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
 			#end_time = time.time()
@@ -749,11 +750,13 @@ def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stret
 				ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
 			if (number_images <= 18):
 				if (SNR_values[idx_cat, i] > -100):
-					if (all_images_filter_name[i] != 'SEGMAP'):
+					#if (all_images_filter_name[i] != 'SEGMAP'):
+					if (SNR_values[idx_cat, i] != -9999):
 						ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
 						ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
 				else:
-					if (all_images_filter_name[i] != 'SEGMAP'):
+					#if (all_images_filter_name[i] != 'SEGMAP'):
+					if (SNR_values[idx_cat, i] != -9999):					
 						ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
 						ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
 			else:
@@ -1178,8 +1181,18 @@ for i in range(0, number_input_lines):
 
 # Open up the image list file
 images_all_txt = np.loadtxt(all_images_file_name, dtype='str')
-all_images_filter_name = images_all_txt[:,0]
-all_image_paths = images_all_txt[:,1]
+if (len(images_all_txt[0]) > 2):
+	# First, if the user specifies where the science data extension is, they'll put 
+	# them in the second column.
+	all_images_filter_name = images_all_txt[:,0]
+	all_image_extension_number = images_all_txt[:,1].astype('int')
+	all_image_paths = images_all_txt[:,2]
+else:
+	# Here, we assume that the science extension is 1 
+	all_images_filter_name = images_all_txt[:,0]
+	all_image_extension_number = np.zeros(len(all_images_filter_name))+1
+	all_image_paths = images_all_txt[:,1]
+
 number_image_filters = len(all_images_filter_name)
 number_images = len(all_image_paths)
 
@@ -1187,14 +1200,18 @@ image_all = np.empty(0)
 image_hdu_all = np.empty(0)
 image_wcs_all = np.empty(0)
 for i in range(0, number_images):
-	#print "Opening up image: "+all_image_paths[i]
+	print("Opening up image: "+all_image_paths[i])
 	if (all_image_paths[i] == 'NoImage'):
 		all_image_paths[i] = 'NoImage.fits'
 	image_all = np.append(image_all, fits.open(all_image_paths[i]))
 	try:
-		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+		#image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
+		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[all_image_extension_number[i]])
 	except IndexError:
+		#print('IndexError')
 		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
+		#print('Running fits.open('+str(all_image_paths[i])+')')
+	#print('Running WCS(image_hdu_all[i].header)')
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 
 
@@ -1243,13 +1260,19 @@ image_flux_value_err_cat = np.zeros([number_objects, number_image_filters])
 SNR_values = np.zeros([number_objects, number_image_filters])
 
 for j in range(0, number_image_filters):
-	if (all_images_filter_name[j] == 'SEGMAP'):
-		SNR_values[:,j] = -9999
-		
-	else:
+	try:
 		image_flux_value_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]]
 		image_flux_value_err_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]+'_err']
 		SNR_values[:,j] = image_flux_value_cat[:,j] / image_flux_value_err_cat[:,j]
+
+	except:		
+		#if (all_images_filter_name[j] == 'SEGMAP'):
+		SNR_values[:,j] = -9999
+#		
+#	else:
+#		image_flux_value_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]]
+#		image_flux_value_err_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]+'_err']
+#		SNR_values[:,j] = image_flux_value_cat[:,j] / image_flux_value_err_cat[:,j]
 
 number_input_objects = len(ID_values)
 ID_iterator = 0
@@ -1376,8 +1399,13 @@ if not (args.id_number):
 		# Set up index array for 
 		ID_list_indices = np.zeros(number_id_list, dtype = int)
 		for x in range(0, number_id_list):
-			ID_list_indices[x] = np.where(ID_values == ID_numbers_to_view[x])[0]
-	
+			#print(np.where(ID_values == ID_numbers_to_view[x])[0])
+			#print(len(np.where(ID_values == ID_numbers_to_view[x])[0]))
+			if (len(np.where(ID_values == ID_numbers_to_view[x])[0]) > 0):
+				ID_list_indices[x] = np.where(ID_values == ID_numbers_to_view[x])[0]
+			else:
+				sys.exit("Object "+str(ID_numbers_to_view[x])+" does not appear in this catalog. Exiting.")
+					
 		ID_list = ID_numbers_to_view
 		current_index = ID_list_indices[ID_iterator]
 		current_id = ID_values[current_index]
