@@ -131,6 +131,16 @@ parser.add_argument(
   required=False
 )
 
+# Optional Output Folder
+parser.add_argument(
+  '-output_folder','--output_folder',
+  help="Optional Output Folder?",
+  action="store",
+  type=str,
+  dest="output_folder",
+  required=False
+)
+
 # Input ra and dec value
 parser.add_argument(
   '-radec','--radec',
@@ -148,6 +158,16 @@ parser.add_argument(
   action="store",
   type=str,
   dest="radec_value_list",
+  required=False
+)
+
+# Use RA DEC list ID
+parser.add_argument(
+  '-use_ra_dec_list_id','--use_ra_dec_list_id',
+  help="Use ID in RA/DEC list?",
+  action="store",
+  type=str,
+  dest="use_ra_dec_list_id",
   required=False
 )
 
@@ -298,12 +318,22 @@ if (args.radec_value_list):
 	
 		objRA_list = fitsinput[1].data['RA']
 		objDEC_list = fitsinput[1].data['DEC']
+		
+		if (args.use_ra_dec_list_id):
+			objID_list = fitsinput[1].data['ID']
+		
 	else:
 		radec_value_list_txt = np.loadtxt(args.radec_value_list, dtype = 'str')
-		
-		objRA_list_raw = radec_value_list_txt[:,0]
-		objDEC_list_raw = radec_value_list_txt[:,1]
 
+		if (args.use_ra_dec_list_id):
+			objID_list = radec_value_list_txt[:,0]
+			objRA_list_raw = radec_value_list_txt[:,1]
+			objDEC_list_raw = radec_value_list_txt[:,2]
+
+		else:
+			objRA_list_raw = radec_value_list_txt[:,0]
+			objDEC_list_raw = radec_value_list_txt[:,1]
+	
 		objRA_list = np.zeros(len(objRA_list_raw))
 		objDEC_list = np.zeros(len(objRA_list_raw))
 		for i in range(0, len(objRA_list_raw)):
@@ -316,12 +346,21 @@ make_crosshair = False
 
 stretch = defaultstretch
 
+if (args.output_folder):
+	output_folder = args.output_folder
+else:
+	output_folder = './'
+
+
 for obj in range(0, number_ra_dec_list):
 
 	objRA = objRA_list[obj]
 	objDEC = objDEC_list[obj]
 
-	obj_output_file_name = 'obj_ra_+'+str(round(objRA,6))+'_dec_'+str(round(objDEC,6))
+	if (args.use_ra_dec_list_id):
+		obj_output_file_name = objID_list[obj]
+	else:
+		obj_output_file_name = 'obj_ra_+'+str(round(objRA,6))+'_dec_'+str(round(objDEC,6))
 
 	if (not os.path.exists(obj_output_file_name+'/')):
 		os.makedirs(obj_output_file_name+'/')
@@ -501,7 +540,7 @@ for obj in range(0, number_ra_dec_list):
 			else:
 				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
 
-		fig2.savefig(obj_output_file_name+'/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.png', dpi = 300)
+		fig2.savefig(output_folder+obj_output_file_name+'/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.png', dpi = 300)
 		plt.close(fig2)
 		
 		# And now, let's save the fits file
@@ -510,13 +549,13 @@ for obj in range(0, number_ra_dec_list):
 		#hdu_cutout.header.update(image_cutout.wcs.to_header())
 		#hdu_cutout.writeto(obj_output_file_name+'/fits/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.fits', overwrite = True)
 
-	fig.savefig(obj_output_file_name+'/'+obj_output_file_name+'_All_Filters.png', dpi = 300)
+	fig.savefig(output_folder+obj_output_file_name+'/'+obj_output_file_name+'_All_Filters.png', dpi = 300)
 	plt.close(fig)
 	
 	# Create the tarfile
 	if (args.create_tarball):
-		tar = tarfile.open(obj_output_file_name+".tar.gz", "w:gz")
-		for name in [obj_output_file_name]:
+		tar = tarfile.open(output_folder+obj_output_file_name+".tar.gz", "w:gz")
+		for name in [output_folder+obj_output_file_name]:
 		    tar.add(name)
 		tar.close()
 		
