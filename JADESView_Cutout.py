@@ -313,7 +313,7 @@ if (args.radec_value):
 	
 if (args.radec_value_list):
 	if (args.radec_value_list.endswith('.fits')):
-		fitsinput = fits.open(args.radec_list)
+		fitsinput = fits.open(args.radec_value_list)
 	
 		objRA_list = fitsinput[1].data['RA']
 		objDEC_list = fitsinput[1].data['DEC']
