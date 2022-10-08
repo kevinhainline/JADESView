@@ -53,17 +53,17 @@ def print_nearest_objects(ID_values, catalog_ra, catalog_dec, ra_value, dec_valu
 	object_ra_dec = SkyCoord(ra=ra_value*u.degree, dec=dec_value*u.degree)
 	close_objects = np.where(object_ra_dec.separation(c) < distance*u.arcsec)
 	
-	print("------------------------------------------------------------------------------------------")
+	print("     ------------------------------------------------------------------------------------------")
 	if (len(close_objects[0]) < 1):
-		print("There are no objects within "+str(distance)+" arcseconds of the position.")
+		print("     There are no objects within "+str(distance)+" arcseconds of the position.")
 	if (len(close_objects[0]) == 1):
-		print("This object is within "+str(distance)+" arcseconds of the position RA = "+str(round(ra_value,6))+", DEC = "+str(round(dec_value,6))+":")
-		print("       "+str(ID_values[close_objects[0]][0])+", RA = "+str(catalog_ra[close_objects[0]][0])+", DEC = "+str(catalog_dec[close_objects[0]][0])+", distance = "+str(round(object_ra_dec.separation(c)[close_objects[0][0]].arcsec,3))+" arcsec")
+		print("      This object is within "+str(distance)+" arcseconds of the position RA = "+str(round(ra_value,6))+", DEC = "+str(round(dec_value,6))+":")
+		print("            "+str(ID_values[close_objects[0]][0])+", RA = "+str(catalog_ra[close_objects[0]][0])+", DEC = "+str(catalog_dec[close_objects[0]][0])+", distance = "+str(round(object_ra_dec.separation(c)[close_objects[0][0]].arcsec,3))+" arcsec")
 	if (len(close_objects[0]) > 1):
-		print("These objects are within "+str(distance)+" arcseconds of the position RA = "+str(round(ra_value,6))+", DEC = "+str(round(dec_value,6))+":")
+		print("     These objects are within "+str(distance)+" arcseconds of the position RA = "+str(round(ra_value,6))+", DEC = "+str(round(dec_value,6))+":")
 		for q in range(0, len(close_objects[0])):
 			print("       "+str(ID_values[close_objects[0]][q])+", RA = "+str(catalog_ra[close_objects[0]][q])+", DEC = "+str(catalog_dec[close_objects[0]][q])+", distance = "+str(round(object_ra_dec.separation(c)[close_objects[0][q]].arcsec,3))+" arcsec")
-	print("------------------------------------------------------------------------------------------")
+	print("     ------------------------------------------------------------------------------------------")
 
 # 110.7431250 -73.4758056
 def parse_ra_dec(ra_dec_string):
@@ -357,12 +357,14 @@ for obj in range(0, number_ra_dec_list):
 	objDEC = objDEC_list[obj]
 
 	if (args.use_ra_dec_list_id):
-		obj_output_file_name = objID_list[obj]
+		obj_output_file_name = 'Object_'+str(objID_list[obj])
 	else:
 		obj_output_file_name = 'obj_ra_+'+str(round(objRA,6))+'_dec_'+str(round(objDEC,6))
 
-	if (not os.path.exists(obj_output_file_name+'/')):
-		os.makedirs(obj_output_file_name+'/')
+	print(obj_output_file_name)
+
+	if (not os.path.exists(output_folder+obj_output_file_name+'/')):
+		os.makedirs(output_folder+obj_output_file_name+'/')
 		#os.makedirs(obj_output_file_name+'/fits/')
 
 	cosdec_center = math.cos(objDEC * 3.141593 / 180.0)
