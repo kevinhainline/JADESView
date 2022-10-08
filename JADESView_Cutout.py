@@ -170,6 +170,15 @@ parser.add_argument(
   required=False
 )
 
+# Make fits file?
+parser.add_argument(
+  '-make_fits','--make_fits',
+  help="Make fits files? (This only works when you don't run -use_ra_dec_list_id)",
+  action="store_true",
+  dest="make_fits",
+  required=False
+)
+
 # Timer Verbose
 parser.add_argument(
   '-create_tarball',
@@ -210,6 +219,10 @@ for i in range(0, number_input_lines):
 
 # # # # # # # # # # # # # # # # # # 
 # Let's open up all the input files
+
+if (args.make_fits):
+	if (args.radec_value_list):
+		sys.exit("ERROR! Exiting: this code can currently only make fits file output for individual objects at a time.")
 
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)
@@ -310,6 +323,8 @@ if (args.radec_value):
 	#ra_dec = ra_dec_string.split(' ')
 	#objRA_list = np.array([float(ra_dec[0])])
 	#objDEC_list = np.array([float(ra_dec[1])])
+
+
 	
 if (args.radec_value_list):
 	if (args.radec_value_list.endswith('.fits')):
@@ -365,7 +380,9 @@ for obj in range(0, number_ra_dec_list):
 
 	if (not os.path.exists(output_folder+obj_output_file_name+'/')):
 		os.makedirs(output_folder+obj_output_file_name+'/')
-		#os.makedirs(obj_output_file_name+'/fits/')
+	if (args.make_fits):
+		if (not os.path.exists(output_folder+obj_output_file_name+'/fits/')):
+			os.makedirs(output_folder+obj_output_file_name+'/fits/')
 
 	cosdec_center = math.cos(objDEC * 3.141593 / 180.0)
 	
@@ -395,7 +412,8 @@ for obj in range(0, number_ra_dec_list):
 		image_hdu = image_hdu_all[i]
 		image_wcs = image_wcs_all[i]
 		
-		#hdu_cutout = image_hdu
+		if (args.make_fits):
+			hdu_cutout = image_hdu
 		
 		row_position = (number_rows + 1) - (np.floor((i)/6)+1)
 		col_position = ((i)%6)+1
@@ -544,11 +562,12 @@ for obj in range(0, number_ra_dec_list):
 		fig2.savefig(output_folder+obj_output_file_name+'/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.png', dpi = 300)
 		plt.close(fig2)
 		
-		# And now, let's save the fits file
-		
-		#hdu_cutout.data = image_cutout.data
-		#hdu_cutout.header.update(image_cutout.wcs.to_header())
-		#hdu_cutout.writeto(obj_output_file_name+'/fits/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.fits', overwrite = True)
+		if (args.make_fits):
+			# And now, let's save the fits file
+			
+			hdu_cutout.data = image_cutout.data
+			hdu_cutout.header.update(image_cutout.wcs.to_header())
+			hdu_cutout.writeto(output_folder+obj_output_file_name+'/fits/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.fits', overwrite = True)
 
 	fig.savefig(output_folder+obj_output_file_name+'/'+obj_output_file_name+'_All_Filters.png', dpi = 300)
 	plt.close(fig)
