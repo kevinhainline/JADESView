@@ -165,8 +165,7 @@ parser.add_argument(
 parser.add_argument(
   '-use_ra_dec_list_id','--use_ra_dec_list_id',
   help="Use ID in RA/DEC list?",
-  action="store",
-  type=str,
+  action="store_true",
   dest="use_ra_dec_list_id",
   required=False
 )
