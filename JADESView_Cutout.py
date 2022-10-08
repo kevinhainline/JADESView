@@ -13,7 +13,7 @@ from requests.auth import HTTPBasicAuth
 from io import BytesIO
 import numpy as np
 import matplotlib
-#matplotlib.use("TkAgg")
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.io import ascii
