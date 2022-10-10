@@ -151,6 +151,16 @@ parser.add_argument(
   required=False
 )
 
+# Input ra and dec value
+parser.add_argument(
+  '-id_number','--id_number',
+  help="ID Number of object in catalog",
+  action="store",
+  type=str,
+  dest="id_number",
+  required=False
+)
+
 # List of input ra and dec values
 parser.add_argument(
   '-radec_list','--radec_list',
@@ -353,6 +363,13 @@ if (args.radec_value_list):
 		for i in range(0, len(objRA_list_raw)):
 			objRA_list[i], objDEC_list[i] = parse_ra_dec(objRA_list_raw[i]+' '+objDEC_list_raw[i])
 
+if (args.id_number):
+	object_index = np.where(ID_values == int(args.id_number))[0]
+	objID_list = np.array([ID_values[object_index]])
+	objRA_list = np.array([RA_values[object_index]])
+	objDEC_list = np.array([DEC_values[object_index]])
+	
+
 number_ra_dec_list = len(objRA_list)
 current_ra_dec_index = 0
 
@@ -371,7 +388,9 @@ for obj in range(0, number_ra_dec_list):
 	objRA = objRA_list[obj]
 	objDEC = objDEC_list[obj]
 
-	if (args.use_ra_dec_list_id):
+	if (args.id_number):
+		obj_output_file_name = 'Object_'+str(objID_list[obj])
+	elif (args.use_ra_dec_list_id):
 		obj_output_file_name = 'Object_'+str(objID_list[obj])
 	else:
 		obj_output_file_name = 'obj_ra_+'+str(round(objRA,6))+'_dec_'+str(round(objDEC,6))
