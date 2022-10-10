@@ -364,7 +364,7 @@ if (args.radec_value_list):
 			objRA_list[i], objDEC_list[i] = parse_ra_dec(objRA_list_raw[i]+' '+objDEC_list_raw[i])
 
 if (args.id_number):
-	object_index = np.where(ID_values == int(args.id_number))[0]
+	object_index = np.where(ID_values == int(args.id_number))[0][0]
 	objID_list = np.array([ID_values[object_index]])
 	objRA_list = np.array([RA_values[object_index]])
 	objDEC_list = np.array([DEC_values[object_index]])
