@@ -1248,7 +1248,7 @@ eazy_positionx, eazy_positiony = 500*sf, 245*sf
 eazytext_positionx, eazytext_positiony = 820*sf, 10*sf
 beagle_positionx, beagle_positiony = 1500*sf, 350*sf
 beagletext_positionx, beagletext_positiony = 1780*sf, 10*sf#1300*sf, 70*sf
-bagpipes_positionx, bagpipes_positiony = 1490*sf, 275*sf
+bagpipes_positionx, bagpipes_positiony = 1490*sf, 330*sf#1490*sf, 275*sf
 objectID_positionx, objectID_positiony = 20*sf, 10*sf#1300*sf, 70*sf
 
 # Open up the photometric catalog
