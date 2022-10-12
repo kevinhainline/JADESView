@@ -99,7 +99,7 @@ def getSEDzimage(ID):
 
 def getBAGPIPESimage(ID):
 	start_time = time.time()
-	bagpipes_file_name_individual = '{:05d}.png'.format(ID-1)
+	bagpipes_file_name_individual = '{:05d}.png'.format(ID)
 	bagpipes_file_name = BAGPIPES_files+bagpipes_file_name_individual
 
 	if (bagpipes_file_name.startswith('http')):
