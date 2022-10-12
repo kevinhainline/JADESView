@@ -101,7 +101,6 @@ def getBAGPIPESimage(ID):
 	start_time = time.time()
 	bagpipes_file_name_individual = '{:05d}.png'.format(ID)
 	bagpipes_file_name = BAGPIPES_files+bagpipes_file_name_individual
-	print(bagpipes_file_name)
 
 	if (bagpipes_file_name.startswith('http')):
 		response = requests.get(bagpipes_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
@@ -489,7 +488,7 @@ def cropEAZY(img):
 def cropBAGPIPES(img):
 
 	#output_image = img.crop((0, 0, 3300, 1600))
-	output_bagpipes_image = img.crop((0, 375, 1915, 1554))
+	output_bagpipes_image = img.crop((0, 0, 3982, 2749))
 
 	return output_bagpipes_image
 
@@ -1465,7 +1464,7 @@ if (BEAGLE_plots_exist == True):
 	new_image = getBEAGLEimage(current_id)
 	new_photo = resizeimage(new_image)
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-	Label(root, text="BEAGLE FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
+	otherfit_label = Label(root, text="BEAGLE FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
 else:
 	item5 = None
 
