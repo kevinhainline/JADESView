@@ -942,8 +942,8 @@ def plotbeagle():
 	if (timer_verbose):
 		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
 	
-	btn9.config(font=('helvetica bold', textsizevalue))
-	btn11.config(font=('helvetica', textsizevalue))
+	btn13.config(font=('helvetica bold', textsizevalue))
+	btn10.config(font=('helvetica', textsizevalue))
 
 	otherfit_label.configure(text="BEAGLE FIT")  
 	
@@ -985,6 +985,9 @@ def plotbagpipes():
 	end_time = time.time()
 	if (timer_verbose):
 		print("Creating the BAGPIPES canvas: " +str(end_time - start_time))
+
+	btn10.config(font=('helvetica bold', textsizevalue))
+	btn13.config(font=('helvetica', textsizevalue))
 
 	otherfit_label.configure(text="BAGPIPES FIT")  
 
@@ -1028,8 +1031,8 @@ def plotsedz():
 	if (timer_verbose):
 		print("Creating the SEDz canvas: " +str(end_time - start_time))
 
-	btn9.config(font=('helvetica', textsizevalue))
-	btn11.config(font=('helvetica bold', textsizevalue))
+	#btn9.config(font=('helvetica', textsizevalue))
+	#btn11.config(font=('helvetica bold', textsizevalue))
 
 
 def getfile_value(current_id, results_IDs, results_values, round_value):
