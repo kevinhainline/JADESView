@@ -1467,7 +1467,9 @@ if (BEAGLE_plots_exist == True):
 	new_image = getBEAGLEimage(current_id)
 	new_photo = resizeimage(new_image)
 	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-	otherfit_label = Label(root, text="BEAGLE FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=beagletext_positionx, y = beagletext_positiony)
+	otherfit_label = Label(root, text="BEAGLE FIT ", font = "Helvetica "+str(int(textsizevalue*1.5)), fg="black", bg="white")
+	otherfit_label.place(x=beagletext_positionx, y = beagletext_positiony)
+
 else:
 	item5 = None
 
