@@ -943,7 +943,7 @@ def plotbeagle():
 		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
 	
 	btn9.config(font=('helvetica bold', textsizevalue))
-	btn11.config(font=('helvetica', textsizevalue))
+	bnt9.config(font=('helvetica', textsizevalue))
 
 	otherfit_label.configure(text="BEAGLE FIT")  
 	
