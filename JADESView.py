@@ -1696,10 +1696,10 @@ btn12.place(x = 400*sf, y = (toprow_y-25.0)*sf)
 # # # # # # # # #  
 # Alternate Fits 
 
-# The button to plot the SEDz results
-#btn9 = Button(root, text = 'BEAGLE', bd = '5', command = plotbeagle)  
-#btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica bold', textsizevalue))
-#btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
+# The button to plot the BEAGLE results
+btn9 = Button(root, text = 'BEAGLE', bd = '5', command = plotbeagle)  
+btn9.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica bold', textsizevalue))
+btn9.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
 
 # The button to plot the BAGPIPES results
 if (BAGPIPES_plots_exist == True):
