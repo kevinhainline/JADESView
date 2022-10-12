@@ -944,7 +944,8 @@ def plotbeagle():
 	
 	btn9.config(font=('helvetica bold', textsizevalue))
 	btn11.config(font=('helvetica', textsizevalue))
-	
+
+	otherfit_label.configure(text="BEAGLE FIT")  
 	
 def plotbagpipes():
 	global e2
@@ -984,6 +985,8 @@ def plotbagpipes():
 	end_time = time.time()
 	if (timer_verbose):
 		print("Creating the BAGPIPES canvas: " +str(end_time - start_time))
+
+	otherfit_label.configure(text="BAGPIPES FIT")  
 
 def plotsedz():
 	global e2
