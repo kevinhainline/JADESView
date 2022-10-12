@@ -101,6 +101,7 @@ def getBAGPIPESimage(ID):
 	start_time = time.time()
 	bagpipes_file_name_individual = '{:05d}.png'.format(ID)
 	bagpipes_file_name = BAGPIPES_files+bagpipes_file_name_individual
+	print(bagpipes_file_name)
 
 	if (bagpipes_file_name.startswith('http')):
 		response = requests.get(bagpipes_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
