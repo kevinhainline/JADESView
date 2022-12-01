@@ -1145,26 +1145,30 @@ for i in range(0, number_input_lines):
 	if (input_lines[i,0] == 'EAZY_results'):
 		EAZY_results_file = input_lines[i,1]
 		EAZY_results_file_exists = True
+		EAZY_results_file_exists = os.path.exists(EAZY_results_file)
 	if (input_lines[i,0] == 'BEAGLE_files'):
 		BEAGLE_files = input_lines[i,1]
 		BEAGLE_plots_exist = True
 	if (input_lines[i,0] == 'BEAGLE_results'):
 		BEAGLE_results_file = input_lines[i,1]
 		BEAGLE_results_file_exists = True
+		BEAGLE_results_file_exists = os.path.exists(BEAGLE_results_file)
 	if (input_lines[i,0] == 'BAGPIPES_files'):
 		BAGPIPES_files = input_lines[i,1]
 		BAGPIPES_plots_exist = True
 	if (input_lines[i,0] == 'BAGPIPES_results'):
 		BAGPIPES_results_file = input_lines[i,1]
 		BAGPIPES_results_file_exists = True
+		BAGPIPES_results_file_exists = os.path.exists(BAGPIPES_results_file)
 	if (input_lines[i,0] == 'SEDz_files'):
 		SEDz_files = input_lines[i,1]
 	if (input_lines[i,0] == 'NN_results'):
 		NN_results_file = input_lines[i,1]
 		NN_results_file_exists = True
+		NN_results_file_exists = os.path.exists(NN_results_file)
 	if (input_lines[i,0] == 'color_selection_results'):
 		color_selection_results_file = input_lines[i,1]
-		#color_selection_results_file_exists = True
+		color_selection_results_file_exists = True
 		color_selection_results_file_exists = os.path.exists(color_selection_results_file)
 	if (input_lines[i,0] == 'output_flags_file'):
 		output_flags_file = input_lines[i,1]
