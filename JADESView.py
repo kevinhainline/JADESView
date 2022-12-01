@@ -1164,7 +1164,8 @@ for i in range(0, number_input_lines):
 		NN_results_file_exists = True
 	if (input_lines[i,0] == 'color_selection_results'):
 		color_selection_results_file = input_lines[i,1]
-		color_selection_results_file_exists = True
+		#color_selection_results_file_exists = True
+		color_selection_results_file_exists = os.path.exists(color_selection_results_file)
 	if (input_lines[i,0] == 'output_flags_file'):
 		output_flags_file = input_lines[i,1]
 	if (input_lines[i,0] == 'output_notes_file'):
@@ -1201,6 +1202,8 @@ else:
 
 number_image_filters = len(all_images_filter_name)
 number_images = len(all_image_paths)
+
+# astropy.io.fits.open(...,memmap='True',lazy_load_hdus='True')
 
 image_all = np.empty(0)
 image_hdu_all = np.empty(0)
