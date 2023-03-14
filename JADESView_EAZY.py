@@ -785,28 +785,33 @@ if (EAZY_results_file_exists == True):
 # Flag Object Buttons
 
 # Create the Bad Fit Flag
-btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
+#btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
+btn1 = Button(root, text = 'Review (2)', bd = '5', command = badfit)
 btn1.config(height = int(2*sf), width = int(13*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
 btn1.place(x = 600*sf, y = 1400*sf)
 
 # Create the High Redshift Flag Button
-btn1 = Button(root, text = 'High Redshift', bd = '5', command = highz)
+#btn1 = Button(root, text = 'High Redshift', bd = '5', command = highz)
+btn1 = Button(root, text = 'Keep (1)', bd = '5', command = highz)
 btn1.config(height = int(2*sf), width = int(11*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue), padx = 20, pady = 3)
 btn1.place(x = 765*sf, y = 1400*sf)
 
 # Create the High Redshift, Next Object Flag Button
-btn1 = Button(root, text = 'High Redshift, Next Object', bd = '5', command = highz_next)
+#btn1 = Button(root, text = 'High Redshift, Next Object', bd = '5', command = highz_next)
+btn1 = Button(root, text = 'Keep (1), Next Object', bd = '5', command = highz_next)
 btn1.config(height = int(2*sf), width = int(20*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue), padx = 20, pady = 3)
 btn1.place(x = 1300*sf, y = 1380*sf)
 
 # Create the Bad Data Flag
-btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
+#btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
+btn1 = Button(root, text = 'Reject (3)', bd = '5', command = baddata)
 btn1.config(height = int(2*sf), width = int(13*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
 btn1.place(x = 975*sf, y = 1400*sf)
 
 # Create the Bad Data Flag, Next Object
-btn1 = Button(root, text = 'Bad Data, Next Object', bd = '5', command = baddata_next)
-btn1.config(height = int(2*sf), width = int(20*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
+#btn1 = Button(root, text = 'Bad Data, Next Object', bd = '5', command = baddata_next)
+btn1 = Button(root, text = 'Reject (3), Next Object', bd = '5', command = baddata_next)
+btn1.config(height = int(2*sf), width = int(25*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
 btn1.place(x = 1600*sf, y = 1380*sf)
 
 # refresh_object
