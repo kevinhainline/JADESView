@@ -189,6 +189,15 @@ parser.add_argument(
   required=False
 )
 
+# Make fits file?
+parser.add_argument(
+  '-error_files','--error_files',
+  help="Produce error files? (This only works when you run -make_fits)",
+  action="store_true",
+  dest="error_files",
+  required=False
+)
+
 # Timer Verbose
 parser.add_argument(
   '-create_tarball',
@@ -234,6 +243,11 @@ if (args.make_fits):
 	if (args.radec_value_list):
 		sys.exit("ERROR! Exiting: this code can currently only make fits file output for individual objects at a time.")
 
+if (args.error_files):
+	if !(args.make_fits):
+		sys.exit("ERROR! Exiting: this code can currently only make error fits files if you set --make_fits to true")
+		
+
 # Open up the photometric catalog
 fitsinput = fits.open(input_photometry)
 ID_values = fitsinput[1].data['ID'].astype('int')
@@ -263,6 +277,9 @@ number_images = len(all_image_paths)
 image_all = np.empty(0)
 image_hdu_all = np.empty(0)
 image_wcs_all = np.empty(0)
+if (args.error_files):
+	number_NRC_files = len(np.where(all_image_extension_number == 1)[0])
+	image_errors_all = np.empty(0)
 #for i in range(0, number_images):
 #	#print "Opening up image: "+all_image_paths[i]
 #	if (all_image_paths[i] == 'NoImage'):
@@ -288,6 +305,9 @@ for i in range(0, number_images):
 	#print('Running WCS(image_hdu_all[i].header)')
 	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
 
+	if (args.error_files):
+		if (all_image_extension_number[i] == 1):
+			image_errors_all = np.append(image_errors_all, fits.open(all_image_paths[i])[2])
 
 
 sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canvas
@@ -449,6 +469,10 @@ for obj in range(0, number_ra_dec_list):
 		image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
 		#end_time = time.time()
 		#print("       Running Cutout2D: " +str(end_time - start_time))
+		if (args.error_files):
+			if (all_image_extension_number[i] == 1):
+				image_error = image_errors_all[i].data
+				image_error_cutout = Cutout2D(image_error, position, size, wcs=image_wcs)
 
 		SNR_fontsize_large = int(15.0*sf)
 		SNR_fontsize_small = int(12.0*sf)
@@ -587,6 +611,14 @@ for obj in range(0, number_ra_dec_list):
 			hdu_cutout.data = image_cutout.data
 			hdu_cutout.header.update(image_cutout.wcs.to_header())
 			hdu_cutout.writeto(output_folder+obj_output_file_name+'/fits/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'.fits', overwrite = True)
+
+		if (args.error_files):
+			# Let's make the error files, as well. 
+			if (all_image_extension_number[i] == 1):
+				hdu_error_cutout.data = image_error_cutout.data
+				hdu_error_cutout.header.update(image_error_cutout.wcs.to_header())
+				hdu_error_cutout.writeto(output_folder+obj_output_file_name+'/fits/'+obj_output_file_name+'_'+str(all_images_filter_name[i])+'_error.fits', overwrite = True)
+		
 
 	fig.savefig(output_folder+obj_output_file_name+'/'+obj_output_file_name+'_All_Filters.png', dpi = 300)
 	plt.close(fig)
