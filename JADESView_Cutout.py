@@ -244,7 +244,7 @@ if (args.make_fits):
 		sys.exit("ERROR! Exiting: this code can currently only make fits file output for individual objects at a time.")
 
 if (args.error_files):
-	if !(args.make_fits):
+	if not (args.make_fits):
 		sys.exit("ERROR! Exiting: this code can currently only make error fits files if you set --make_fits to true")
 		
 
@@ -308,7 +308,6 @@ for i in range(0, number_images):
 	if (args.error_files):
 		if (all_image_extension_number[i] == 1):
 			image_errors_all = np.append(image_errors_all, fits.open(all_image_paths[i])[2])
-
 
 sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canvas
                           # element positions and sizes are shrunk or expanded. I 
@@ -423,6 +422,9 @@ for obj in range(0, number_ra_dec_list):
 		if (not os.path.exists(output_folder+obj_output_file_name+'/fits/')):
 			os.makedirs(output_folder+obj_output_file_name+'/fits/')
 
+	if (args.error_files):
+		number_error_file = 0
+
 	cosdec_center = math.cos(objDEC * 3.141593 / 180.0)
 	
 	print_nearest_objects(ID_values, RA_values, DEC_values, objRA, objDEC, ra_dec_size_value/2.0)
@@ -453,6 +455,7 @@ for obj in range(0, number_ra_dec_list):
 		
 		if (args.make_fits):
 			hdu_cutout = image_hdu
+			hdu_error_cutout = image_hdu
 		
 		row_position = (number_rows + 1) - (np.floor((i)/6)+1)
 		col_position = ((i)%6)+1
@@ -471,9 +474,10 @@ for obj in range(0, number_ra_dec_list):
 		#print("       Running Cutout2D: " +str(end_time - start_time))
 		if (args.error_files):
 			if (all_image_extension_number[i] == 1):
-				image_error = image_errors_all[i].data
+				image_error = image_errors_all[number_error_file].data
 				image_error_cutout = Cutout2D(image_error, position, size, wcs=image_wcs)
-
+				number_error_file = number_error_file + 1
+				
 		SNR_fontsize_large = int(15.0*sf)
 		SNR_fontsize_small = int(12.0*sf)
 						
