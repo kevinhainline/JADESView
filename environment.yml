@@ -5,5 +5,4 @@ dependencies:
   - scipy
   - astropy
   - matplotlib
-  - tkinter
   - h5py
