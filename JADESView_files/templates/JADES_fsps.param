@@ -1,0 +1,31 @@
+# Template definition file
+#
+# No blank lines allowed (for now).
+#
+# Column definitions:
+#   1. Template number
+#   2. Template file name
+#   3. Lambda_conv (multiplicative factor to correct wavelength units)
+#   4. Age of template model in Gyr (0 means template is always used)
+#   5. Template error amplitude (for INDIVIDUAL template fits)
+#   6. Comma/space separated list of template numbers to be combined
+#      with current template if combined fits are enabled.
+#
+# Sample entry:
+# 1 [path_to_file]/template1.sed 1.0 14.7 0.2 2,3,5
+1   JADESView_files/templates/JADES_fsps_templates/eazy_v1.1_sed1.sed    1.0 0 1.0   
+2   JADESView_files/templates/JADES_fsps_templates/eazy_v1.1_sed2.sed    1.0 0 1.0   
+3   JADESView_files/templates/JADES_fsps_templates/eazy_v1.1_sed3.sed    1.0 0 1.0   
+4   JADESView_files/templates/JADES_fsps_templates/eazy_v1.1_sed4.sed    1.0 0 1.0   
+5   JADESView_files/templates/JADES_fsps_templates/eazy_v1.1_sed5.sed    1.0 0 1.0   
+6   JADESView_files/templates/JADES_fsps_templates/eazy_v1.1_sed6.sed    1.0 0 1.0   
+7   JADESView_files/templates/JADES_fsps_templates/eazy_v1.1_sed7.sed    1.0 0 1.0   
+8   JADESView_files/templates/JADES_fsps_templates/ssp_25Myr_z008_withem.sed    1.0 0 1.0   
+9   JADESView_files/templates/JADES_fsps_templates/ssp_5Myr_z008_withem.sed    1.0 0 1.0   
+10  JADESView_files/templates/JADES_fsps_templates/c09_del_8.6_z_0.019_chab_age09.40_av2.0.sed  1.0 0 1.0   
+11  JADESView_files/templates/JADES_fsps_templates/erb2010_highEW.sed   1.0 0 1.0    
+12  JADESView_files/templates/JADES_fsps_templates/tau_0.01_age_0.1_dust2_0.0_fsps_model.sed    1.0 0 1.0 
+13  JADESView_files/templates/JADES_fsps_templates/tau_0.0398_age_0.3162_dust2_0.0_fsps_model.sed    1.0 0 1.0 
+14  JADESView_files/templates/JADES_fsps_templates/tau_1.0_age_11.749_dust2_0.0_fsps_model.sed    1.0 0 1.0 
+15  JADESView_files/templates/JADES_fsps_templates/tau_10.0_age_0.01_dust2_0.0_fsps_model.sed    1.0 0 1.0 
+16  JADESView_files/templates/JADES_fsps_templates/tau_10.0_age_0.01_dust2_0.6_fsps_model.sed    1.0 0 1.0 

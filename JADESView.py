@@ -1,1101 +1,1036 @@
-#! /usr/bin/env python
+#!/usr/bin/env python
+"""\
+JADESView v2
+Kevin Hainline
 
+Usage: This file runs EAZY on JADES catalog sources, and plots the SED and chi-square surface
+       in a GUI, where the user can also specify where mosaic images are for plotting
+       thumbnails. 
+
+	   https://github.com/kevinhainline/JADESView
+"""
 import os
+import copy
 import ast
+import shutil
 import sys
 import math
-import time 
-import argparse
-import requests
-from requests.auth import HTTPBasicAuth
-from io import BytesIO
+import astropy
 import numpy as np
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
+import argparse
+import matplotlib.pyplot as plt 
 from astropy.io import fits
 from astropy.io import ascii
 from astropy.table import Table
+
+import tkinter as tk
+from tkinter import ttk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+import h5py 
+import eazy 
+import eazy.hdf5 
+
+import webbrowser
+
+from multiprocessing import Pool
 
 from astropy.nddata import Cutout2D
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
+import tarfile
 
-from astropy.visualization import (MinMaxInterval, ZScaleInterval, LogStretch, ImageNormalize, AsinhStretch, SinhStretch, LinearStretch)
+from astropy.visualization import (ZScaleInterval, ImageNormalize, LinearStretch)
 
-import matplotlib.backends.tkagg as tkagg
-from matplotlib.backends.backend_agg import FigureCanvasAgg
+# Set up some colors. 
+template_color = '#56B4E9'#'#117733'#'green'
+NIRC_photometry_color = '#D55E00'#'#882255'#'red'
+HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
+chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
+zspec_color = '#332288'#'orange'
 
-import webbrowser
-def callback(url):
-    webbrowser.open_new(url)
+output_plot_folder = ''
 
 
-#from Tkinter import *
-try:
-    from Tkinter import *
-except ImportError:
-    from tkinter import *
-import PIL
-from PIL import ImageTk, Image, ImageGrab
+def flambda_to_fnu(waveang,flambda):
+	return (waveang**2.0) / 2.99792458e+18 * flambda
 
-JADESView_input_file = 'JADESView_input_file.dat'
+def FluxtoABMag(flux):
+	return (-5.0 / 2.0) * np.log10(flux) - 48.60
 
-# The default stretch on the various images
-defaultstretch = 'LinearStretch'
+def ABMagtoFlux(abmag):
+	return np.power(10, (abmag + 48.60)/-2.5)
 
-# The default size of the various images
-ra_dec_size_value = 2.0
-
-# The default is to not make the crosshair
-make_crosshair = False
-
-# Currently, for testing JADESView, we have z_spec
-use_zspec = True
-
-def getEAZYimage(ID):
-	start_time = time.time()
-	EAZY_file_name = EAZY_files+str(ID)+'_EAZY_SED.png'
-
-	if (EAZY_file_name.startswith('http')):
-		response = requests.get(EAZY_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		image = Image.open(BytesIO(response.content))
+def RawCatalog_To_Fluxes_Errs_RA_DEC(raw_catalog_file, short_filter_list, blended, convolved, which_aperture_phot, uncertainty_to_use):
+	# Start by converting the raw output catalog into an input EAZY py catalog 
+	
+	# Set up the output file location / name
+	raw_catalog_file_tag = ''	
+	blended_flag = 'input.'
+	convolved_flag = ''
+	if (blended == True):
+		raw_catalog_file_tag = 'blended'	
+		blended_flag = 'blended_input.'
+	if (convolved == True):
+		convolved_flag = 'conv'
+	
+	# Here's the input file
+	blended_convolved_flag = blended_flag + convolved_flag
+	if (convolved == True):
+		blended_convolved_flag = blended_convolved_flag + '.'
+	output_file_name = 'phot_cat.'+which_aperture_phot+'.'+blended_convolved_flag+'fits'
+	
+	# And now set up the HDU name from the file. 
+	if(which_aperture_phot.startswith('KRON')):
+		if (convolved == False):
+			hdu_name = 'KRON'
+		if (convolved == True):
+			hdu_name = 'KRON_CONV'
+	elif(which_aperture_phot.startswith('CIRC')):
+		if (convolved == False):
+			hdu_name = 'CIRC'
+		if (convolved == True):
+			hdu_name = 'CIRC_CONV'	
 	else:
-		image = Image.open(EAZY_file_name)
+		sys.exit('bad aperture phot!')
+
+	raw_catalog = fits.open(raw_catalog_file, memmap = True)
+	raw_ID = raw_catalog[hdu_name].data['ID'].astype(int)
+	raw_RA_phot = raw_catalog[hdu_name].data['RA']
+	raw_DEC_phot = raw_catalog[hdu_name].data['DEC']
+	raw_number_pixels = 1.0*(raw_catalog['SIZE'].data['BBOX_XMAX'] - raw_catalog['SIZE'].data['BBOX_XMIN']+1) * (raw_catalog['SIZE'].data['BBOX_YMAX'] - raw_catalog['SIZE'].data['BBOX_YMIN']+1)
+	raw_number_pixels_flag_region = 1.0*(raw_catalog['SIZE'].data['BBOX_XMAX'] - raw_catalog['SIZE'].data['BBOX_XMIN']+21) * (raw_catalog['SIZE'].data['BBOX_YMAX'] - raw_catalog['SIZE'].data['BBOX_YMIN']+21)
+	no_pixels_detected = np.where(raw_number_pixels == 0)[0]
+	raw_number_pixels[no_pixels_detected] = 1
+
+	number_objects = len(raw_ID)
+
+	bad_pixel_fraction_cut = 0.05
+
+	number_filters = len(short_filter_list)
+
+	raw_flux = np.zeros([number_objects, number_filters])
+	raw_flux_errors = np.zeros([number_objects, number_filters])
+
+	for q in range(0, len(short_filter_list)):
+	
+		try:
+			raw_flux[:,q] = raw_catalog[hdu_name].data[short_filter_list[q]+'_'+which_aperture_phot]
+			raw_flux_errors[:,q] = raw_catalog[hdu_name].data[short_filter_list[q]+'_'+which_aperture_phot+uncertainty_to_use]
 		
-	end_time = time.time()
-	if (timer_verbose):
-		print("Fetching the EAZY image: " +str(end_time - start_time))
-
-	return image
-
-def getBEAGLEimage(ID):
-	start_time = time.time()
-	BEAGLE_file_name = BEAGLE_files+str(ID)+'_BEAGLE_SED.png'
-
-	if (BEAGLE_file_name.startswith('http')):
-		response = requests.get(BEAGLE_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		image = Image.open(BytesIO(response.content))
-	else:
-		image = Image.open(BEAGLE_file_name)
-
-	end_time = time.time()
-	if (timer_verbose):
-		print("Fetching the BEAGLE image: " +str(end_time - start_time))
-
-	return image
-
-def getSEDzimage(ID):
-	start_time = time.time()
-	SEDz_file_name = SEDz_files+str(ID)+'_BEAGLE_SED.png'
-
-	if (SEDz_file_name.startswith('http')):
-		response = requests.get(SEDz_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		image = Image.open(BytesIO(response.content))
-	else:
-		image = Image.open(SEDz_file_name)
-		
-	end_time = time.time()
-	if (timer_verbose):
-		print("Fetching the SEDz image: " +str(end_time - start_time))
-
-	return image
-
-def getBAGPIPESimage(ID):
-	start_time = time.time()
-	bagpipes_file_name_individual = '{:05d}.png'.format(ID)
-	bagpipes_file_name = BAGPIPES_files+bagpipes_file_name_individual
-
-	if (bagpipes_file_name.startswith('http')):
-		response = requests.get(bagpipes_file_name, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		image = Image.open(BytesIO(response.content))
-	else:
-		image = Image.open(bagpipes_file_name)
-		
-	end_time = time.time()
-	if (timer_verbose):
-		print("Fetching the BAGPIPES image: " +str(end_time - start_time))
-
-	return image
-
-def resizeimage(image):
-	global baseplotwidth
-	wpercent = (baseplotwidth / float(image.size[0]))
-	hsize = int((float(image.size[1]) * float(wpercent)))
-	image = image.resize((baseplotwidth, hsize), PIL.Image.ANTIALIAS)
-	photo = ImageTk.PhotoImage(image)
-	return photo
-
-def resizeBAGPIPESimage(image):
-	global BAGPIPESbaseplotwidth
-	wpercent = (BAGPIPESbaseplotwidth / float(image.size[0]))
-	hsize = int((float(image.size[1]) * float(wpercent)))
-	image = image.resize((BAGPIPESbaseplotwidth, hsize), PIL.Image.ANTIALIAS)
-	photo = ImageTk.PhotoImage(image)
-	return photo
-
-def highz():
-	global current_index
-	global ID_iterator
-	global ID_list
-	global highZflag_array
+			zero_values = np.where((raw_catalog['FLAG'].data[short_filter_list[q]+'_FLAG'] == -1) | (raw_catalog['FLAG'].data[short_filter_list[q]+'_FLAG']*1.0/raw_number_pixels_flag_region > bad_pixel_fraction_cut) | (raw_flux_errors[:,q] == 0.00) | np.isnan(raw_flux[:,q]) | np.isnan(raw_flux_errors[:,q]) | np.isinf(raw_flux[:,q]) | np.isinf(raw_flux_errors[:,q]))[0]
 	
-	highZflag_array[current_index] = 1
-	current_id = ID_list[ID_iterator]
-	print("Object "+str(current_id)+" is a high-redshift candidate.")
+			raw_flux[zero_values,q] = -9999.
+			raw_flux_errors[zero_values,q] = -9999.
+		except KeyError:
+			raw_flux[:,q] = -9999
+			raw_flux_errors[:,q] = -9999
 
-def badfit():
-	global current_index
-	global ID_iterator
-	global ID_list
-	global badfitflag_array
+	return raw_ID.astype('int'), raw_flux, raw_flux_errors, raw_RA_phot, raw_DEC_phot
+
+# For an entry redshift, tempfilt, and chi2grid, this returns the closest chisq value. 
+def get_chisq(tempfilt_zgrid, chi2fit, z_a_value):
+	try:
+		return np.round(chi2fit[np.where(tempfilt_zgrid == np.round(z_a_value,2))[0][0]],2)
+	except IndexError:
+		min_difference = np.min(abs(tempfilt_zgrid - np.round(z_a_value,2)))
+		if (min_difference < eazy_self.param['Z_STEP']):
+			return np.round(chi2fit[np.argmin(abs(tempfilt_zgrid - np.round(z_a_value,2)))],2)
+		else:
+			sys.exit("New chisq not found?")
+
+# Given an RA, DEC, and a namestub ("JADES-GS"), this returns the full name of the source
+def RADEC_to_RADECName(RA, DEC, namestub):
+	RA_string = str(round(RA,5))
+	DEC_string =  str(round(DEC,5))
+	if (RA > 0):
+		RA_string = '+'+RA_string
+	if (DEC > 0):
+		DEC_string = '+'+DEC_string
 	
-	badfitflag_array[current_index] = 1
-	current_id = ID_list[ID_iterator]
-	print("Object "+str(current_id)+" has a bad fit.")
+	ID_RA_DEC =  namestub+RA_string+DEC_string
 
-def baddata():
-	global current_index
-	global ID_iterator
-	global ID_list
-	global baddataflag_array
-	
-	baddataflag_array[current_index] = 1
-	current_id = ID_list[ID_iterator]
-	print("Object "+str(current_id)+" object has bad data.")
+	return ID_RA_DEC
 
-def update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak):
-	eazy_z_peak = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
-	eazy_z_a = getfile_value(current_id, eazy_results_IDs, eazy_results_za, 4)
-	eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
-	eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
+# This is the function that allows you to get the image cutout given an RA/DEC.
+def return_image_cutout(objRA, objDEC, image_hdu, image_wcs, thumbnail_size):
 
-	eazy_label_zpeak.configure(text="z_EAZY, peak = "+str(eazy_z_peak)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")")  
-	eazy_label_za.configure(text="z_EAZY, a = "+str(eazy_z_a))  
-
-
-def update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg):
-	beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
-	beagle_z_l68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zl68, 4)
-	beagle_z_u68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zu68, 4)
-	
-	beagle_label.configure(text="z_BEAGLE,avg = "+str(beagle_z_avg)+" ("+str(beagle_z_l68)+" - "+str(beagle_z_u68)+")")  
-	beagle_z_1 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_1, 4)
-	beagle_z_1_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_1, 4)
-	beagle_z1_label.configure(text="z_BEAGLE,1 = "+str(beagle_z_1)+" +/- "+str(beagle_z_1_err))  
-	beagle_z_2 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_2, 4)
-	beagle_z_2_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_2, 4)
-	beagle_z2_label.configure(text="z_BEAGLE,2 = "+str(beagle_z_2)+" +/- "+str(beagle_z_2_err))  
-
-	beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
-	beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
-	beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
-	beagle_prob_label.configure(text="P(z > 2) = "+str(beagle_Pzgt2p0)+", P(z > 4) = "+str(beagle_Pzgt4p0)+", P(z > 4) = "+str(beagle_Pzgt6p0))  
-
-def update_NN_text(current_id, NN_results_IDs, NN_results_zpred):
-
-	NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
-	NN_use = getfile_true_or_false(current_id, NN_results_IDs, NN_results_use)
-	
-	if (NN_use == True):
-		nn_label.configure(text="z_NN = "+str(NN_zpred), fg = 'black')  
-	if (NN_use == False):
-		nn_label.configure(text="z_NN = "+str(NN_zpred)+" (USE = F)", fg = 'grey')  
-
-	if(use_zspec == True):
-		NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
-		nn_label_zspec.configure(text="z_spec = "+str(NN_zspec))  
-	
-def update_color_selection_text(current_id, color_selection_results_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts):
-	is_F090W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F090W_dropouts)
-	is_F115W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F115W_dropouts)
-	is_F150W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F150W_dropouts)
-
-	if (is_F090W_dropout):
-		color_selection_label.configure(text="F090W Dropout")  
-	elif (is_F115W_dropout):
-		color_selection_label.configure(text="F115W Dropout")  
-	elif (is_F150W_dropout):
-		color_selection_label.configure(text="F150W Dropout")  
-	else:
-		color_selection_label.configure(text=" ")  
-	
-def update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot):
-	BAGPIPES_zpred = getfile_value(current_id-1, BAGPIPES_results_IDs, BAGPIPES_results_zphot, 4)
-	bagpipes_label.configure(text="z_BAGPIPES = "+str(BAGPIPES_zpred))
-		
-
-def nextobject():
-	global e2
-	global ID_iterator
-	global current_index
-	global ID_list
-	global ID_list_indices
-	global photo
-	global new_photo
-	global item4
-	global item5
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-
-	global eazy_positionx, eazy_positiony
-	global eazytext_positionx, eazytext_positiony
-	global beagle_positionx, beagle_positiony
-	global beagletext_positionx, beagletext_positiony
-
-	#global eazy_results_IDs, eazy_results_zpeak
-	#global beagle_results_IDs, eazy_results_zavg
-	
-	notes_values[current_index] = e2.get()
-	e2.delete(0,END)
-
-	if (ID_iterator < len(ID_list)-1):
-		ID_iterator = ID_iterator+1
-#	else:
-#		len(ID_list)-1
-#		save_destroy()
-	
-	if (item4 is not None):
-		canvas.delete(item4)
-
-	if (item5 is not None):
-		canvas.delete(item5)
-
-		
-	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[ID_iterator]
-	e2.insert(0, notes_values[current_index])
-
-	#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
-	if (EAZY_plots_exist == True):
-		image = getEAZYimage(current_id)
-		start_time = time.time()
-		image = cropEAZY(image)
-		end_time = time.time()
-		if (timer_verbose):
-			print("Cropping the EAZY image: " +str(end_time - start_time))
-		start_time = time.time()
-		photo = resizeimage(image)
-		end_time = time.time()
-		if (timer_verbose):
-			print("Resizing the EAZY image: " +str(end_time - start_time))
-		start_time = time.time()
-		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-		end_time = time.time()
-		if (timer_verbose):
-			print("Creating the EAZY canvas: " +str(end_time - start_time))
-	
-	if (BEAGLE_plots_exist == True):
-		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-		new_image = getBEAGLEimage(current_id)
-		start_time = time.time()
-		new_photo = resizeimage(new_image)
-		end_time = time.time()
-		if (timer_verbose):
-			print("Resizing the BEAGLE image: " +str(end_time - start_time))
-		start_time = time.time()
-		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-		end_time = time.time()
-		if (timer_verbose):
-			print("Creating the BEAGLE canvas: " +str(end_time - start_time))
-	
-	start_time = time.time()
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Creating the thumbnails: " +str(end_time - start_time))
-		
-	object_label.configure(text="Object "+str(current_id))  
-
-	canvas.delete("separator")
-	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
-	if (EAZY_results_file_exists):
-		update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
-	if (BEAGLE_results_file_exists):
-		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
-	if (NN_results_file_exists):
-		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
-	if (color_selection_results_file_exists):
-		update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
-	if (BAGPIPES_results_file_exists):
-		update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot)
-
-	if (fitsmap_link_exists == True):
-		final_fitsmap_link = get_fitsmap_link(fitsmap_link, current_id, ID_values, RA_values, DEC_values)
-		link.bind("<Button-1>", lambda e: callback(final_fitsmap_link))
-
-
-def previousobject():
-	global ID_iterator
-	global current_index
-	global e2
-	global ID_list
-	global ID_list_indices
-	global photo
-	global new_photo
-	global item4
-	global item5
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-
-	global eazy_positionx, eazy_positiony
-	global eazytext_positionx, eazytext_positiony
-	global beagle_positionx, beagle_positiony
-	global beagletext_positionx, beagletext_positiony
-
-	#global eazy_results_IDs, eazy_results_zpeak
-	#global beagle_results_IDs, eazy_results_zavg
-
-	notes_values[current_index] = e2.get()
-	e2.delete(0,END)
-
-	if (ID_iterator > 0):
-		ID_iterator = ID_iterator-1
-	else:
-		ID_iterator = 0
-	
-	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[ID_iterator]
-	e2.insert(0, notes_values[current_index])
-
-	if (EAZY_plots_exist == True):
-		canvas.delete(item4)
-		#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
-		image = getEAZYimage(current_id)
-		image = cropEAZY(image)
-		photo = resizeimage(image)
-		item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-		
-	if (BEAGLE_plots_exist == True):
-		canvas.delete(item5)
-		#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-		new_image = getBEAGLEimage(current_id)
-		new_photo = resizeimage(new_image)
-		item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
-
-	object_label.configure(text="Object "+str(current_id))  
-
-	canvas.delete("separator")
-	redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
-	if (EAZY_results_file_exists):
-		update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
-	if (BEAGLE_results_file_exists):
-		update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
-	if (NN_results_file_exists):
-		update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
-	if (color_selection_results_file_exists):
-		update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
-	if (BAGPIPES_results_file_exists):
-		update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot)
-
-	if (fitsmap_link_exists == True):
-		final_fitsmap_link = get_fitsmap_link(fitsmap_link, current_id, ID_values, RA_values, DEC_values)
-		link.bind("<Button-1>", lambda e: callback(final_fitsmap_link))
-
-
-def gotoobject():
-
-	global ID_iterator
-	global current_index
-	global e2
-	global ID_list
-	global ID_list_indices
-	global photo
-	global new_photo
-	global item4
-	global item5
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-
-	global eazy_positionx, eazy_positiony
-	global eazytext_positionx, eazytext_positiony
-	global beagle_positionx, beagle_positiony
-	global beagletext_positionx, beagletext_positiony
-
-	#global eazy_results_IDs, eazy_results_zpeak
-	#global beagle_results_IDs, eazy_results_zavg
-
-	notes_values[current_index] = e2.get()
-	e2.delete(0,END)
-
-	if (e1.get().isdigit() == True):
-
-		#current_id = int(e1.get())
-		ID_iterator = np.where(ID_list == int(e1.get()))[0][0]
-
-		current_index = ID_list_indices[ID_iterator]
-		current_id = ID_list[ID_iterator]
-		e2.insert(0, notes_values[current_index])
-	
-		#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
-		if (EAZY_plots_exist == True):
-			canvas.delete(item4)
-			image = getEAZYimage(current_id)
-			image = cropEAZY(image)
-			photo = resizeimage(image)
-			item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-		
-		if (BEAGLE_plots_exist == True):
-			canvas.delete(item5)
-			#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-			new_image = getBEAGLEimage(current_id)
-			new_photo = resizeimage(new_image)
-			item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-	
-		fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
-
-		object_label.configure(text="Object "+str(current_id))  
-
-		canvas.delete("separator")
-		redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
-		if (EAZY_results_file_exists):
-			update_eazy_text(current_id, eazy_results_IDs, eazy_results_zpeak)
-		if (BEAGLE_results_file_exists):
-			update_beagle_text(current_id, beagle_results_IDs, beagle_results_zavg)
-		if (NN_results_file_exists):
-			update_NN_text(current_id, NN_results_IDs, NN_results_zpred)
-		if (color_selection_results_file_exists):
-			update_color_selection_text(current_id, color_selection_IDs, color_selection_F090W_dropouts, color_selection_F115W_dropouts, color_selection_F150W_dropouts)
-		if (BAGPIPES_results_file_exists):
-			update_BAGPIPES_text(current_id, BAGPIPES_results_IDs, BAGPIPES_results_zphot)
-
-		if (fitsmap_link_exists == True):
-			final_fitsmap_link = get_fitsmap_link(fitsmap_link, current_id, ID_values, RA_values, DEC_values)
-			link.bind("<Button-1>", lambda e: callback(final_fitsmap_link))
-
-	else:
-		print("That's not a valid ID number.")
-
-def togglecrosshair():
-	global ID_iterator
-	global ID_list
-	global ID_list_indices
-	global canvas   
-	global fig_photo_objects
-	global ra_dec_size_value
-	global defaultstretch
-
-	global make_crosshair
-	
-	if (make_crosshair == False):
-		make_crosshair = True
-		btn12.config(font=('helvetica bold', textsizevalue))
-
-	else:
-		make_crosshair = False
-		btn12.config(font=('helvetica', textsizevalue))
-		
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
-
-# This will remove the thumbnails, for future work
-def cropEAZY(img):
-
-	#output_image = img.crop((0, 0, 3300, 1600))
-	output_image = img.crop((0, 0, 3300, 1480))
-
-	return output_image
-
-# This will remove the thumbnails, for future work
-def cropBAGPIPES(img):
-
-	#output_image = img.crop((0, 0, 3300, 1600))
-	output_bagpipes_image = img.crop((0, 0, 3982, 2749))
-
-	return output_bagpipes_image
-
-def linearstretch():
-	global sf
-	global textsizevalue
-	global ID_iterator
-	global ID_list
-	global ID_list_indices
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-	global btn5
-	global btn6
-	global btn7
-
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-
-	defaultstretch = 'LinearStretch'	
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
-
-def logstretch():
-	global sf
-	global textsizevalue
-	global ID_iterator
-	global ID_list
-	global ID_list_indices
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-	global btn5
-	global btn6
-	global btn7
-
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-
-	defaultstretch = 'LogStretch'
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
-
-def asinhstretch():
-	global sf
-	global textsizevalue
-	global ID_iterator
-	global ID_list
-	global ID_list_indices
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-	global btn5
-	global btn6
-	global btn7
-
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
-
-	defaultstretch = 'AsinhStretch'
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
-
-# This is kind of a hack to make sure that the image thumbnail size is printed on
-# the output files, since none of the labels or buttons are printed when you use
-# canvas.postscript()
-def save_canvas():
-	global thumbnailsize
-	global sf
-	global canvas
-	global ID_list
-	global ID_iterator
-	global e3
-
-	current_id = ID_list[ID_iterator]
-
-	ra_dec_size_value = float(e3.get())
-
-	fig = plt.figure(figsize=(thumbnailsize*2.51,thumbnailsize/4.0))
-	ax8 = fig.add_axes([0, 0, 1, 1])
-	ax8.text(0.02, 0.5, "Image Size: "+str(ra_dec_size_value)+"\" x "+str(ra_dec_size_value)+"\"", transform=ax8.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
-	fig_x = 20*sf
-	if (number_images <= 6):
-		fig_y = 760*sf
-	if ((number_images > 6) & (number_images <= 12)):
-		fig_y = 900*sf
-	if (number_images > 12):
-		fig_y = 1040*sf	
-
-	fig_size_object = draw_figure(canvas, fig, loc=(fig_x, fig_y))
-
-	#fig = plt.figure(figsize=(thumbnailsize*2.51,thumbnailsize/4.0))
-	fig2 = plt.figure(figsize=(7, 2.5))
-	ax9 = fig2.add_axes([0, 0, 1, 1])
-	if (EAZY_results_file_exists):
-		eazy_z_peak = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
-		eazy_z_a = getfile_value(current_id, eazy_results_IDs, eazy_results_za, 4)
-		eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
-		eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
-		ax9.text(0.02, 0.9, "z_EAZY, peak = "+str(eazy_z_peak)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#133e7c')
-		ax9.text(0.02, 0.8, "z_EAZY, peak = "+str(eazy_z_a), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#133e7c')
-	if (BEAGLE_results_file_exists):
-		beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
-		beagle_z_l68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zl68, 4)
-		beagle_z_u68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zu68, 4)
-		
-		beagle_z_1 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_1, 4)
-		beagle_z_1_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_1, 4)
-		beagle_z_2 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_2, 4)
-		beagle_z_2_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_2, 4)
-	
-		beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
-		beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
-		beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
-
-		ax9.text(0.02, 0.7, "z_BEAGLE,avg = "+str(beagle_z_avg)+" ("+str(beagle_z_l68)+" - "+str(beagle_z_u68)+")", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
-		ax9.text(0.02, 0.6, "z_BEAGLE,1 = "+str(beagle_z_1)+" +/- "+str(beagle_z_1_err), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
-		ax9.text(0.02, 0.5, "z_BEAGLE,2 = "+str(beagle_z_2)+" +/- "+str(beagle_z_2_err), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
-		ax9.text(0.02, 0.4, "P(z > 2) = "+str(beagle_Pzgt2p0)+", P(z > 4) = "+str(beagle_Pzgt4p0)+", P(z > 4) = "+str(beagle_Pzgt6p0), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='left', va='center', color = '#711c91')
-	if (NN_results_file_exists):
-		NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
-		ax9.text(0.98, 0.9, "z_NN = "+str(NN_zpred), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = '#091833')		
-		if (use_zspec == True):
-			NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
-			ax9.text(0.98, 0.8, "z_spec = "+str(NN_zspec), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'red')		
-	if (color_selection_results_file_exists):
-		is_F090W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F090W_dropouts)
-		is_F115W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F115W_dropouts)
-		is_F150W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F150W_dropouts)
-
-		if (is_F090W_dropout):
-			ax9.text(0.98, 0.1, "F090W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
-		elif (is_F115W_dropout):
-			ax9.text(0.98, 0.1, "F115W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
-		elif (is_F150W_dropout):
-			ax9.text(0.98, 0.1, "F150W Dropout", transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = 'black')
-	if (BAGPIPES_results_file_exists):
-		BAGPIPES_zpred = getfile_value(current_id-1, BAGPIPES_results_IDs, BAGPIPES_results_zphot, 4)
-		ax9.text(0.98, 0.3, "z_BAGPIPES = "+str(BAGPIPES_zpred), transform=ax9.transAxes, fontsize=14, fontweight='bold', ha='right', va='center', color = '#091833')		
-
-
-	fig2_x = 950
-	fig2_y = 650
-	
-	fig2_size_object = draw_figure(canvas, fig2, loc=(fig2_x, fig2_y))
-	#fig.close()
-
-	# The text needs to be at: 1100, 600
-	#fig2 = plt.figure(figsize=(500,200))
-	#ax9 = fig.add_axes([0, 0, 1, 1])
-	#ax9.text(0.1, 0.1, "z_EAZY = "+str(eazy_z)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", transform=ax9.transAxes, fontsize=12, fontweight='bold', ha='left', va='center', color = 'black')
-	#fig_x = 1100
-	#fig_y = 600
-	#fig_redshift_object = draw_figure(canvas, fig2, loc=(fig_x, fig_y))
-	#fig2.close()
-
-	output_filename = str(current_id)+'_JADESView'
-	canvas.postscript(file=output_filename+'.eps', colormode='color')
-	
-	# use PIL to convert to PNG 
-	img = Image.open(output_filename+'.eps') 
-	os.system('rm '+output_filename+'.eps')
-	#print output_filename+'.png'
-	img.save(output_filename+'.png', 'png') 
-
-def changeradecsize():
-	global ID_iterator
-	global ID_list
-	global ID_list_indices
-	global canvas   
-	global fig_photo_objects
-	global ra_dec_size_value
-	global defaultstretch
-	global e3
-
-	ra_dec_size_value = float(e3.get())
-	fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, ID_list[ID_iterator], ID_list_indices[ID_iterator], defaultstretch)
-
-
-def draw_figure(canvas, figure, loc=(0, 0)):
-    """ Draw a matplotlib figure onto a Tk canvas
-
-    loc: location of top-left corner of figure on canvas in pixels.
-    Inspired by matplotlib source: lib/matplotlib/backends/backend_tkagg.py
-    """
-    figure_canvas_agg = FigureCanvasAgg(figure)
-    figure_canvas_agg.draw()
-    figure_x, figure_y, figure_w, figure_h = figure.bbox.bounds
-    figure_w, figure_h = int(figure_w), int(figure_h)
-    photo = PhotoImage(master=canvas, width=figure_w, height=figure_h)
-
-    # Position: convert from top-left anchor to center anchor
-    canvas.create_image(loc[0] + figure_w/2, loc[1] + figure_h/2, image=photo)
-
-    # Unfortunately, there's no accessor for the pointer to the native renderer
-    tkagg.blit(photo, figure_canvas_agg.get_renderer()._renderer, colormode=2)
-
-    # Return a handle which contains a reference to the photo object
-    # which must be kept live or else the picture disappears
-    return photo
-
-def create_thumbnails(canvas, fig_photo_objects, id_value, id_value_index, stretch):
-	#global ID_values
-	global thumbnailsize
-	global RA_values
-	global DEC_values
-	global ra_dec_size_value
-	global image_all
-	global image_hdu_all
-	global image_wcs_all
-	global image_flux_value_err_cat
-	global all_images_filter_name
-	global number_images
-	global SNR_values
-	
-	# Let's associate the selected object with it's RA and DEC		
-	# Create the object thumbnails. 
-	#idx_cat = np.where(ID_values == id_value)[0]
-	idx_cat = id_value_index
-	objRA = RA_values[idx_cat]
-	objDEC = DEC_values[idx_cat]
-			
+	rasize_value = thumbnail_size#2.0
+	decsize_value = thumbnail_size#2.0
 	cosdec_center = math.cos(objDEC * 3.141593 / 180.0)
-		
+
 	# Set the position of the object
 	position = SkyCoord(str(objRA)+'d '+str(objDEC)+'d', frame='fk5')
-	size = u.Quantity((ra_dec_size_value, ra_dec_size_value), u.arcsec)
+	size = u.Quantity((decsize_value, rasize_value), u.arcsec)
 	
-	fig_photo_objects = np.empty(0, dtype = 'object')
-	for i in range(0, number_images):
-		image = image_hdu_all[i].data
-		image_hdu = image_hdu_all[i]
-		image_wcs = image_wcs_all[i]
-				
-#		if (all_images_filter_name[i] == 'HST_F814W'):
-#			image_wcs.sip = None
+	image = image_hdu.data
+	try:
+		image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
+	except astropy.nddata.utils.NoOverlapError:
+		image_cutout = -9999
+	
+	return image_cutout#.data	
+
+
+# This returns the EAZY output values and arrays for plotting
+def return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0):#, h5file = False, savefile = None, savesed = False, savechisq = False):
+	
+	# First, the redshift grid for the chisq surface. 
+	output_zgrid = eazy_self.zgrid#np.arange(self.param['Z_MIN'], self.param['Z_MAX'], self.param['Z_STEP'])
+
+	# the index of the source. 
+	i = np.where(eazy_self.OBJID == object_ID)[0][0]
+
+	# Let's get the data from the eazy-py file 
+	tempfilt_zgrid = eazy_self.zgrid
+	chi2fit = eazy_self.chi2_fit[i,:]
+
+	output_chisq = eazy_self.chi2_fit[i,:]
+	
+	z_a_value = np.round(zout['z_raw_chi2'][i],2)
+	
+	if (primary_z < 0):
+		data = eazy_self.show_fit(object_ID, show_fnu = True, zshow = z_a_value, get_spec = True)
+		output_redshift = z_a_value
+	else:
+		data = eazy_self.show_fit(object_ID, show_fnu = True, zshow = primary_z, get_spec = True)
+		output_redshift = primary_z
+
+	output_wavelength = data['templz']
+	output_flux = data['templf']*1e3
+	output_phot_wavelength = data['pivot']
+	output_phot_template = data['model']*1e3
+	output_phot_err_template = data['emodel']*1e3
+	output_phot = data['fobs']*1e3
+	output_phot_err = data['efobs']*1e3
+	output_tef = data['tef']
+
+	return output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, output_redshift, tempfilt_zgrid, chi2fit
+
+def return_version_string(input_file_name):
+	if (input_file_name.split('/')[-1].startswith('hlsp')):
+		try:
+			version_string = input_file_name.split('/')[-1].split('_')[-2]
+		except IndexError:
+			version_string = 'V???'
 		
-		if (image_flux_value_err_cat[idx_cat, i] > -9999):
-			# Make the cutout
-			#print(all_images_filter_name[i])
-			start_time = time.time()
-			image_cutout = Cutout2D(image, position, size, wcs=image_wcs)
-			#end_time = time.time()
-			#print("       Running Cutout2D: " +str(end_time - start_time))
+	elif (input_file_name.split('/')[-1].startswith('phot')):
+		try:
+			version_string = input_file_name.split('/')[-1].split('.')[1]+'.'+input_file_name.split('/')[-1].split('.')[2]+'.'+input_file_name.split('/')[-1].split('.')[3]
+		except IndexError:
+			version_string = 'V???'
+	else:
+		version_string = 'V???'
+
+	return version_string
+
+# Here's the Plot GUI information
+class PlotGUI:
+	def __init__(self, root):
+		self.root = root
+		self.root.title("JADESView v2")
+  		
+		self.current_ID = -9999
+		self.current_thumbnail_size = -9999
+        
+		# Main container frame
+		main_frame = tk.Frame(root)
+		main_frame.pack(fill=tk.BOTH, expand=True)
+        
+		# Top frame for graph
+		plot_frame = tk.Frame(main_frame)
+		plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        
+		# Create figure and axis for plot
+		self.fig, self.ax = plt.subplots(1,2, figsize=(14, 5))
+		self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
+		self.canvas_widget = self.canvas.get_tk_widget()
+		self.canvas_widget.pack(fill=tk.BOTH, expand=True)
+ 
+		# For clicking.
+		self.canvas.mpl_connect("button_press_event", self.on_plot_click)       
+		
+		if (args_plot_thumbnails):
+			# Bottom frame for image grid
+			image_grid_frame = tk.Frame(main_frame)
+			image_grid_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 			
-			SNR_fontsize_large = int(15.0*sf)
-			SNR_fontsize_small = int(12.0*sf)
-			
-			# Create the wcs axes
-			plt.clf()
-			fig = plt.figure(figsize=(thumbnailsize,thumbnailsize))
-			ax3 = fig.add_axes([0, 0, 1, 1], projection=image_cutout.wcs)
-			if (all_images_filter_name[i] == 'SEGMAP'):
-				ax3.text(0.51, 0.96, all_images_filter_name[i], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
-				ax3.text(0.5, 0.95, all_images_filter_name[i], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
-			
+			# Depending on how many filters you provide, it will change the number of
+			# rows, and the number of columns
+			if (number_image_filters <= 16):
+				n_image_rows = 2
+				n_columns = 8
+				total_possible = 16
+			elif (number_image_filters <= 24):
+				n_image_rows = 3
+				n_columns = 8
+				total_possible = 24
 			else:
-				ax3.text(0.51, 0.96, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'black')
-				ax3.text(0.5, 0.95, all_images_filter_name[i].split('_')[1], transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', ha='center', va='top', color = 'white')
-			if (number_images <= 18):
-				if (SNR_values[idx_cat, i] > -100):
-					#if (all_images_filter_name[i] != 'SEGMAP'):
-					if (SNR_values[idx_cat, i] != -9999):
-						ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
-						ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
-				else:
-					#if (all_images_filter_name[i] != 'SEGMAP'):
-					if (SNR_values[idx_cat, i] != -9999):					
-						ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'black')
-						ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_large, fontweight='bold', horizontalalignment='right', color = 'white')
-			else:
-				if (SNR_values[idx_cat, i] > -100):
-					if (all_images_filter_name[i] != 'SEGMAP'):
-						ax3.text(0.96, 0.06, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
-						ax3.text(0.95, 0.05, 'SNR = '+str(round(SNR_values[idx_cat, i],2)), transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
-				else:
-					if (all_images_filter_name[i] != 'SEGMAP'):
-						ax3.text(0.96, 0.06, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'black')
-						ax3.text(0.95, 0.05, 'SNR < -100', transform=ax3.transAxes, fontsize=SNR_fontsize_small, fontweight='bold', horizontalalignment='right', color = 'white')
+				n_image_rows = 3
+				n_columns = 10
+				total_possible = 30
+			# This creates the plot that will be appended below the SED.
+			self.image_fig, self.image_axes = plt.subplots(n_image_rows, n_columns, figsize=(14, 4))
+	
+			self.image_fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
+			self.image_fig.subplots_adjust(wspace = 0.05, hspace = 0.01)
+			self.image_canvas = FigureCanvasTkAgg(self.image_fig, master=image_grid_frame)
+			self.image_canvas_widget = self.image_canvas.get_tk_widget()
+			self.image_canvas_widget.pack(fill=tk.BOTH, expand=True)
 			
-			if (make_crosshair == True):
-				ax3.plot([0.5, 0.5], [0.65, 0.8], linewidth=2.0, transform=ax3.transAxes, color = 'white')
-				ax3.plot([0.5, 0.5], [0.2, 0.35], linewidth=2.0, transform=ax3.transAxes, color = 'white')
-				ax3.plot([0.2, 0.35], [0.5, 0.5], linewidth=2.0, transform=ax3.transAxes, color = 'white')
-				ax3.plot([0.65, 0.8], [0.5, 0.5], linewidth=2.0, transform=ax3.transAxes, color = 'white')
+			# Load initial images into grid
+			# Initialize with zeroed images. 
+			self.images = [np.zeros([50,50]) for _ in range(total_possible)]
+			for ax, img in zip(self.image_axes.flatten(), self.images):
+				ax.imshow(img, cmap='gray', origin = 'lower')
+				ax.axis('off')
+			self.image_canvas.draw()
+
+        # # # # # #
+		# BUTTONS #
+		# # # # # #
+		 
+		# Bottom row of centered buttons
+		second_row_frame = tk.Frame(root)
+		second_row_frame.pack(side=tk.BOTTOM, fill=tk.X)
+ 
+  		# Update the plot after entering values
+		update_button = tk.Button(second_row_frame, text="Update (Enter)", command=self.update_plot, font=("Helvetica", 12, "bold"))
+		update_button.pack(side=tk.LEFT)
+		#update_button.config(width = 40 )
+       	
+		# Button to reset the SED plot axes
+		reset_button = tk.Button(second_row_frame, text="Reset Axes", command=self.reset_plot, font=("Helvetica", 12, "bold"))
+		reset_button.pack(side=tk.LEFT)
+
+		# Button to quit the program
+		quit_button = tk.Button(second_row_frame, text="Quit", command=root.quit, font=("Helvetica", 12, "bold"))
+		quit_button.pack(side=tk.RIGHT)
+ 
+ 		# Button to save the output plt as a png. 
+		save_button = tk.Button(second_row_frame, text="Save as PNG", command=self.save_gui, font=("Helvetica", 12, "bold"))
+		save_button.pack(side=tk.RIGHT)
+
+ 		# Button to save the output plt as a png. 
+		save_button = tk.Button(second_row_frame, text="Save EAZY SED + Chisq", command=self.save_eazy_sed, font=("Helvetica", 12, "bold"))
+		save_button.pack(side=tk.RIGHT)
+
+		if (args_plot_thumbnails):
+	 		# Button to save the output plt as a png. 
+			save_button = tk.Button(second_row_frame, text="Save Thumbnails", command=self.save_thumbnails, font=("Helvetica", 12, "bold"))
+			save_button.pack(side=tk.RIGHT)
+
+ 		# Button to save the output plt as a png. 
+		fitsmap_link_button = tk.Button(second_row_frame, text="Fitsmap", command=self.open_fitsmap, font=("Helvetica", 12, "bold"))
+		fitsmap_link_button.pack(side=tk.RIGHT)
+
+       
+		# Controls frame
+		controls = tk.Frame(root)
+		controls.pack(side=tk.BOTTOM, fill=tk.X)
+
+		# ID text box
+		tk.Label(controls, text="ID").pack(side=tk.LEFT)
+		self.id_entry = tk.Entry(controls, width=8)
+		self.id_entry.pack(side=tk.LEFT)
+		self.id_entry.insert(0, "")
+                
+        # SED plot Xmin
+		tk.Label(controls, text="X Min:").pack(side=tk.LEFT)
+		self.xmin_entry = tk.Entry(controls, width=5)
+		self.xmin_entry.pack(side=tk.LEFT)
+		self.xmin_entry.insert(0, "0")
+        
+        # SED plot Xmax
+		tk.Label(controls, text="X Max:").pack(side=tk.LEFT)
+		self.xmax_entry = tk.Entry(controls, width=8)
+		self.xmax_entry.pack(side=tk.LEFT)
+		self.xmax_entry.insert(0, "5.5")
+
+        # SED plot Ymin
+		tk.Label(controls, text="Y Min:").pack(side=tk.LEFT)
+		self.ymin_entry = tk.Entry(controls, width=8)
+		self.ymin_entry.pack(side=tk.LEFT)
+		self.ymin_entry.insert(0, "")
+        
+        # SED plot Ymax
+		tk.Label(controls, text="Y Max:").pack(side=tk.LEFT)
+		self.ymax_entry = tk.Entry(controls, width=5)
+		self.ymax_entry.pack(side=tk.LEFT)
+		self.ymax_entry.insert(0, "")
+
+        # SED plot alternate redshift
+		tk.Label(controls, text="Alt z:").pack(side=tk.LEFT)
+		self.altz_entry = tk.Entry(controls, width=5)
+		self.altz_entry.pack(side=tk.LEFT)
+		self.altz_entry.insert(0, "")
+
+  		# Update the plot after entering values
+		previous_button = tk.Button(controls, text="Previous", command=self.previous_object)
+		previous_button.pack(side=tk.LEFT)
+		#update_button.config(width = 40 )
+
+  		# Update the plot after entering values
+		next_button = tk.Button(controls, text="Next", command=self.next_object)
+		next_button.pack(side=tk.LEFT)
+		#update_button.config(width = 40 )
+
+     
+    	# Enter an updated chisq ymax value
+		self.chisq_ymax_entry = tk.Entry(controls, width=5)
+		self.chisq_ymax_entry.pack(side=tk.RIGHT)
+		tk.Label(controls, text="Chisq Y Max:").pack(side=tk.RIGHT)
+		self.chisq_ymax_entry.insert(0, "")
+
+  		# A button to change the chisq plot to P(z) instead. 
+		p_of_z_button = tk.Button(controls, text="P(z)", command=self.p_of_z_plot)
+		p_of_z_button.pack(side=tk.RIGHT)
+
+		if (args_plot_thumbnails):
+			# Enter an updated chisq ymax value
+			self.thumbnail_size = tk.Entry(controls, width=3)
+			self.thumbnail_size.pack(side=tk.RIGHT)
+			tk.Label(controls, text="Thumbnail Size (arcsec):").pack(side=tk.RIGHT)
+			self.thumbnail_size.insert(0, "2")
+
+		# Bind the return button to specify updating the plot
+		self.root.bind('<Return>', lambda event: self.update_plot())
+		self.root.bind('<KP_Enter>', lambda event: self.update_plot())
+		self.root.bind('<Next>', lambda event: self.next_object())
+		self.root.bind('<Prior>', lambda event: self.previous_object())
+
+		# Plot the first object in the list. 
+		self.id_entry.delete(0, tk.END)  # Delete current text
+		self.id_entry.insert(0,str(first_object))
+		#self.fig.tight_layout()
+		self.update_plot()
+
+    # The main driver function that updates plots in the GUI. 
+	def update_plot(self):
+
+		self.ax[0].clear()
+		self.ax[1].clear()
+		
+		# Get the ID entry.
+		if (self.id_entry.get() == ''):
+			print("NOTE: No ID specified, Returning to the first ID number.")
+			self.id_entry.delete(0, tk.END)  # Delete current text
+			self.id_entry.insert(0,str(first_object))
+		
+		object_ID = int(self.id_entry.get())
+		
+		# Check to make sure the user isn't trying to generate a thumbnail with a negative
+		# size.	
+		if (args_plot_thumbnails):
+			if (self.thumbnail_size.get() == ''):
+				print("NOTE: Thumbnail size must be above 0. Resetting to 2 arcseconds.")
+				self.thumbnail_size.delete(0, tk.END)
+				self.thumbnail_size.insert(0,"2") 
+				current_thumbnail_size = 2
+			else:
+				current_thumbnail_size = float(self.thumbnail_size.get())
+
+				if (current_thumbnail_size <=0):
+					print("NOTE: Thumbnail size must be above 0. Resetting to 2 arcseconds.")
+					self.thumbnail_size.delete(0, tk.END)
+					self.thumbnail_size.insert(0,"2") 
+					current_thumbnail_size = 2
+		
+		# Find the index in the input flux file.
+		object_ID_index = np.where(ID_values == object_ID)[0]
+
+		# Make sure that this object ID is actually in the list, otherwise
+		# just revert to the current object ID.
+		input_eazy_index = np.where(eazy_self.OBJID == object_ID)[0]
+		if (len(input_eazy_index) <= 0):
+			print("NOTE: ID "+str(object_ID)+" is not in the input list.")
+			self.id_entry.delete(0, tk.END)
+			self.id_entry.insert(0,str(self.current_ID)) 
+			object_ID = int(self.id_entry.get())
+			object_ID_index = np.where(ID_values == object_ID)[0][0]
+		else:
+			object_ID_index = object_ID_index[0]
+		
+		# Set the RA/Dec for the source.
+		objRA = RA_values[object_ID_index]
+		objDEC = DEC_values[object_ID_index]
+
+		# And here it's hard coded to specify that the source is
+		# in either GOODS-N or GOODS-S
+		if ((objDEC > 62) & (objDEC < 63)):
+			namestub = 'JADES-GN'
+		elif ((objDEC > -28.1) & (objDEC < -27.5)):
+			namestub = 'JADES-GS'
+		else:
+			namestub = 'UNKNOWN'
+			
+		# Get the JADES RA/DEC ID value	
+		JADES_ID = RADEC_to_RADECName(objRA, objDEC, namestub) 
+		
+		# Here are the colors that are used in the plotting.
+		template_color = '#56B4E9'#'#117733'#'green'
+		NIRC_photometry_color = '#D55E00'#'#882255'#'red'
+		HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
+		chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
+		zspec_color = '#332288'#'orange'
+		alternate_color = 'grey'
+
+		# This is the best fit values from EAZY, which we'll always want to keep
+		# on the plot.
+		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+
+		# This determines whether or not there is an alternate redshift specified
+		# by the user. 
+		if (self.altz_entry.get() == ''):
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		else:
+
+			# Make sure that the alternate redshift is between the minimum and maximum values.
+			# Otherwise, reset to the best-fit redshift.
+			if ((float(self.altz_entry.get()) > eazy_self.param['Z_MIN']) and (float(self.altz_entry.get()) < eazy_self.param['Z_MAX'])):
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+			else:
+				self.altz_entry.delete(0, tk.END)
+				self.altz_entry.insert(0,"") 
+				print("NOTE: Alternate redshift must be between "+str(eazy_self.param['Z_MIN'])+" and "+str(eazy_self.param['Z_MAX']))
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+
+		# Let's plot the SED:
+		pos_flux_errors = np.where(output_phot_err > 0)[0]
+		if (self.altz_entry.get() == ''):
+			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = 2, zorder = 0, label = '$z_a$ = '+str(round(z_a_value,2)))
+		else:
+			self.ax[0].plot(bf_output_wavelength/1e4, bf_output_flux, color = 'grey', lw = 2, zorder = 0, label = '$z_a$ = '+str(round(bf_z_a_value,2)), alpha = 0.5)
+			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = 2, zorder = 0, label = '$z_{\mathrm{alt}}$ = '+str(round(z_a_value,2)))
+		self.ax[0].scatter(output_phot_wavelength/1e4, output_phot_template, marker = 's', s = 110, edgecolor = template_color, color = 'None', zorder = 5)
+		
+		# And now let's plot the photometry, along with the flux uncertainties, and the filter widths. 
+		self.ax[0].scatter(output_phot_wavelength[pos_flux_errors]/1e4, output_phot[pos_flux_errors], color = color_filters[pos_flux_errors], s = 50, zorder = 10)
+		self.ax[0].errorbar(output_phot_wavelength[pos_flux_errors]/1e4, output_phot[pos_flux_errors],  xerr = filter_bw[pos_flux_errors]/2.0, yerr = output_phot_err[pos_flux_errors], color = 'black', ls = 'None', alpha = 0.4)
+
+		# Currently, let's look at flux on a logarithmic axis, in the future I'll make
+		# this something you can toggle.	
+		self.ax[0].semilogy()
+		self.ax[0].set_xlabel('Observed Wavelength ($\mu$m)')
+		self.ax[0].set_ylabel('Flux (nJy)')
+		
+		# Make sure that we specify that the SED fit is from EAZY-py.
+		if (args_asada_cgm == True):
+			self.ax[0].text(0.8, 0.06, 'EAZY-py fit, Asada+24 CGM', fontsize = 12, horizontalalignment='center',
+				verticalalignment='center', transform=self.ax[0].transAxes)
+		else:
+			self.ax[0].text(0.85, 0.06, 'EAZY-py fit', fontsize = 12, horizontalalignment='center',
+				verticalalignment='center', transform=self.ax[0].transAxes)
+					
+		# And now let's figure out the X and Y limits for the plot. 
+		# Get the minimum and maximum x value.
+		xmin = float(self.xmin_entry.get())
+		xmax = float(self.xmax_entry.get())
+
+		self.ax[0].set_xlim(xmin, xmax)
+
+		# Which are the positive fluxes? 
+		pos_fluxes = np.where(output_phot > 0)[0]
+
+		if (self.ymin_entry.get() == ''):
+			ymin = np.min(output_phot[pos_fluxes]) - (0.4 * np.min(output_phot[pos_fluxes]))
+			if (ymin < 0.01):
+				ymin = 0.01
+		else:
+			ymin = float(self.ymin_entry.get())
+		if (self.ymax_entry.get() == ''):
+			ymax = np.max(output_phot[pos_fluxes]) + (10.0 * np.max(output_phot[pos_fluxes]))
+			if (ymax > (100.*np.median(output_phot[pos_fluxes]))):
+				ymax = 100.*np.median(output_phot[pos_fluxes])
+		else:
+			ymax = float(self.ymax_entry.get())
+
+		self.ax[0].set_ylim(ymin, ymax)
+
+		# Here's the title for the plot
+		self.ax[0].set_title(JADES_ID+' --- ID '+str(int(object_ID)), fontsize = 15)
+	
+		# And let's set the legend. 
+		self.ax[0].legend(loc = 2, fontsize = 12, frameon=False)
+
+		# First, make sure the user specifies that they want thumbnails
+		if (args_plot_thumbnails):
+			# We only update the thumbnails if the ID has changed. It takes too long
+			# otherwise. 
+			if ((object_ID != self.current_ID) or (current_thumbnail_size != self.current_thumbnail_size)):
+				self.images = []
+				for q in range(0, number_images):
+					filter_image_cutout = return_image_cutout(objRA, objDEC, image_hdu_all[q], image_wcs_all[q], float(self.thumbnail_size.get()))
+					if (filter_image_cutout == -9999):
+						print("Note: No overlap with filter "+str(q))
+						self.images.append(np.zeros([50,50]))
+					else:
+						self.images.append(filter_image_cutout.data)
+
+					image_iterator = np.arange(0, number_images, 1)
+					for j, ax, img in zip(image_iterator, self.image_axes.flatten(), self.images):
+		
+						ax.clear()
+						indexerror = 0
+						try:
+							norm = ImageNormalize(img, interval=ZScaleInterval(), stretch=LinearStretch())
+						except IndexError:
+							indexerror = 1
+						except UnboundLocalError:
+							indexerror = 1
+										
+						if (indexerror == 0):
+							ax.imshow(img, cmap='gray', origin = 'lower', aspect='equal', norm = norm)
+						else:
+							ax.imshow(img, cmap='gray', origin = 'lower', aspect = 'equal')
+		
+						ax.text(0.51, 0.96, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'black')
+						ax.text(0.5, 0.95, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'white')
+		
+						if ((round(SNR_values[object_ID_index,j],2) > -100) and (round(SNR_values[object_ID_index,j],2) < 100)):
+							ax.text(0.5, 0.06, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=12, fontweight='bold', horizontalalignment='center', color = 'black')
+							ax.text(0.5, 0.05, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=12, fontweight='bold', horizontalalignment='center', color = 'white')
+						elif(round(SNR_values[object_ID_index,j],2) > 100):
+							ax.text(0.5, 0.06, 'SNR > 100', transform=ax.transAxes, fontsize=10, fontweight='bold', horizontalalignment='center', color = 'black')
+							ax.text(0.5, 0.05, 'SNR > 100', transform=ax.transAxes, fontsize=10, fontweight='bold', horizontalalignment='center', color = 'white')
+		
+						ax.axis('off')
+					self.image_canvas.draw()
+
+		# Here's the current ID. 
+		self.current_ID = object_ID
+		if (args_plot_thumbnails):
+			self.current_thumbnail_size = current_thumbnail_size
+		
+		# Now, let's plot the chi-square surface. 
+		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
+
+		# Let's grab the chisq value at the specified redshift. 
+		bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
+
+		# Got to get the index within the EAZY object
+		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
+		
+		# Here are the output redshift values from the EAZY fit
+		z160 = zout['z160'][objid_index]
+		z840 = zout['z840'][objid_index]
+		
+		z500 = zout['z500'][objid_index]
+
+		upper_error = z840 - z500
+		lower_error = z500 - z160
+
+		z025 = zout['z025'][objid_index]
+		z975 = zout['z975'][objid_index]
+		
+		self.ax[1].set_xlabel(r'z$_{phot}$')
+		self.ax[1].set_ylabel(r'$\chi^2$')
+		if (self.altz_entry.get() == ''):
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 20)
+		else:
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
+	
+		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
+
+		self.ax[1].axvspan(z025, z975, color = 'grey', zorder = 0, alpha = 0.1)
+		self.ax[1].axvspan(z160, z840, color = 'grey', zorder = 1, alpha = 0.05)
+
+		version_string = return_version_string(args_input_file)
+
+		if (default_convolved == True):
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Convolved', fontsize = 15)
+		else: 
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Not Convolved', fontsize = 15)
+
+		
+		chisq_legend = self.ax[1].legend(loc = 2, fontsize = 12, frameon=False)
+		chisq_legend.set_zorder(50)
+		self.ax[1].set_ylim(-10, np.max(chi2fit)+0.1 * np.max(chi2fit))
+		if (self.chisq_ymax_entry.get() != ''):
+			self.ax[1].set_ylim(-10, float(self.chisq_ymax_entry.get()))
+
+		self.fig.tight_layout()
+		self.canvas.draw()
+
+	def p_of_z_plot(self):
+
+		self.ax[1].clear()
+		template_color = '#56B4E9'#'#117733'#'green'
+		NIRC_photometry_color = '#D55E00'#'#882255'#'red'
+		HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
+		chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
+		zspec_color = '#332288'#'orange'
+		alternate_color = 'grey'
+		
+		object_ID = int(self.id_entry.get())
+
+		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		
+		if (self.altz_entry.get() == ''):
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		else:
+			if ((float(self.altz_entry.get()) > eazy_self.param['Z_MIN']) and (float(self.altz_entry.get()) < eazy_self.param['Z_MAX'])):
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+			else:
+				self.altz_entry.delete(0, tk.END)
+				self.altz_entry.insert(0,"") 
+				print("NOTE: Alternate redshift must be between "+str(eazy_self.param['Z_MIN'])+" and "+str(eazy_self.param['Z_MAX']))
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+
+		p_of_z = np.exp((-1.0) * (chi2fit - np.min(chi2fit))/2.0)
+		
+		# Now, let's plot the chi-square surface. 
+		self.ax[1].plot(tempfilt_zgrid, p_of_z, color = chisq_surface_color, zorder = 40)
+		
+		# Let's grab the chisq value at the specified redshift. 
+		bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
+
+		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
+		z160 = zout['z160'][objid_index]
+		z840 = zout['z840'][objid_index]
+		
+		z500 = zout['z500'][objid_index]
+
+		upper_error = z840 - z500
+		lower_error = z500 - z160
+
+		z025 = zout['z025'][objid_index]
+		z975 = zout['z975'][objid_index]
+		
+		self.ax[1].set_xlabel(r'z$_{phot}$')
+		self.ax[1].set_ylabel(r'$\chi^2$')
+
+		if (self.altz_entry.get() == ''):
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 20)
+		else:
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
+		
+		self.ax[1].axvspan(z500-0.01, z500+0.01, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
+
+		self.ax[1].set_xlim(z160-2,z840+2)
+		self.ax[1].axvspan(z025, z975, color = 'grey', zorder = 0, alpha = 0.2)
+		self.ax[1].axvspan(z160, z840, color = 'grey', zorder = 1, alpha = 0.5)
+
+		pz_legend = self.ax[1].legend(loc = 4, fontsize = 12, frameon=False)
+		pz_legend.set_zorder(50)
+
+		if (self.chisq_ymax_entry.get() != ''):
+			self.ax[1].set_ylim(-10, float(self.chisq_ymax_entry.get()))
+
+		self.fig.tight_layout()
+		self.canvas.draw()
+		
+
+  	      
+    # This will reset the SED plot axes. 
+	def reset_plot(self):
+
+		object_ID = int(self.id_entry.get())
+
+		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		
+		if (self.altz_entry.get() == ''):
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		else:
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+
+		self.ax[0].set_xlim(0, 5.5)
+		self.xmin_entry.delete(0, tk.END)  # Delete current text
+		self.xmin_entry.insert(0,0) 
+		self.xmax_entry.delete(0, tk.END)  # Delete current text
+		self.xmax_entry.insert(0,5.5) 
+
+		pos_fluxes = np.where(output_phot > 0)[0]
+		ymin = np.min(output_phot[pos_fluxes]) - (0.4 * np.min(output_phot[pos_fluxes]))
+		if (ymin < 0.01):
+			ymin = 0.01
+
+		ymax = np.max(output_phot[pos_fluxes]) + (10.0 * np.max(output_phot[pos_fluxes]))
+		if (ymax > (100.*np.median(output_phot[pos_fluxes]))):
+			ymax = 100.*np.median(output_phot[pos_fluxes])
+
+		self.ax[0].set_ylim(ymin, ymax)
+
+		self.ymin_entry.delete(0, tk.END)  # Delete current text
+		self.ymax_entry.delete(0, tk.END)  # Delete current text
+
+		# Now, let's plot the chi-square surface. 
+		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
+
+		# Let's grab the chisq value at the specified redshift. 
+		bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
+
+		# Got to get the index within the EAZY object
+		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
+		
+		# Here are the output redshift values from the EAZY fit
+		z160 = zout['z160'][objid_index]
+		z840 = zout['z840'][objid_index]
+		
+		z500 = zout['z500'][objid_index]
+
+		upper_error = z840 - z500
+		lower_error = z500 - z160
+
+		z025 = zout['z025'][objid_index]
+		z975 = zout['z975'][objid_index]
+		
+		self.ax[1].clear()
+		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
+		self.ax[1].set_xlabel(r'z$_{phot}$')
+		self.ax[1].set_ylabel(r'$\chi^2$')
+
+		if (self.altz_entry.get() == ''):
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 20)
+		else:
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
+
+		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
+
+		self.ax[1].axvspan(z025, z975, color = 'grey', zorder = 0, alpha = 0.1)
+		self.ax[1].axvspan(z160, z840, color = 'grey', zorder = 1, alpha = 0.05)
+
+		version_string = return_version_string(args_input_file)
+
+		if (default_convolved == True):
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Convolved', fontsize = 15)
+		else: 
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Not Convolved', fontsize = 15)
+
+		
+		chisq_legend = self.ax[1].legend(loc = 2, fontsize = 12, frameon=False)
+		chisq_legend.set_zorder(50)
+
+		if (self.chisq_ymax_entry.get() != ''):
+			self.ax[1].set_ylim(-10, float(self.chisq_ymax_entry.get()))
+
+
+		self.fig.tight_layout()
+		self.canvas.draw()
+    
+	def load_images(self):
+		self.images = [np.random.rand(50, 50) for _ in range(10)]
+		for ax, img in zip(self.image_axes.flatten(), self.images):
+			ax.clear()
+			ax.imshow(img, cmap='gray')
+			ax.axis('off')
+		self.fig.tight_layout()
+		self.image_canvas.draw()
+
+	def save_eazy_sed(self):
+		object_ID = int(self.id_entry.get())
+
+		# Get the photometry version
+		version_string = return_version_string(args_input_file)
+
+		if (self.altz_entry.get() == ''):
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		else:
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+
+		# Got to update the base final image name with convolved or unconvolved
+		output_filename = self.id_entry.get()+"_"+version_string+"_"+str(args_aperture)
+		if (default_convolved == True):
+			output_filename = output_filename+"_conv"
+		else: 
+			output_filename = output_filename+"_unconv"
+
+		output_SED_file = output_filename + "_z_"+str(z_a_value) + '_SED_microns_nJy.txt'
+		np.savetxt(output_SED_file, np.c_[output_wavelength/1e4, output_flux], fmt = '%f %f', header="Wavelength (microns) Flux (nJy)")	
+		print("Saving EAZY SED as "+output_SED_file)
+
+		output_chisq_file = output_filename + '_z_chisq.txt'
+		np.savetxt(output_chisq_file, np.c_[tempfilt_zgrid, chi2fit], fmt = '%f %f', header="Redshift chisq")	
+		print("Saving EAZY chisq as "+output_chisq_file)
+
+
+	def save_gui(self):
+		# Get the photometry version
+		version_string = return_version_string(args_input_file)
+
+		# Need to get the z_a_value to set the base final image name
+		if (self.altz_entry.get() == ''):
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(int(self.id_entry.get()), eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		else:
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(int(self.id_entry.get()), eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+		
+		# Got to update the base final image name with convolved or unconvolved
+		output_filename = self.id_entry.get()+"_"+version_string+"_"+str(args_aperture)
+		if (default_convolved == True):
+			output_filename = output_filename+"_conv"
+		else: 
+			output_filename = output_filename+"_unconv"
+
+		# This version has the thumbnails.
+		if (args_plot_thumbnails):
+			combined_fig, combined_axes = plt.subplots(2, 1, figsize=(13, 9))
+			
+			# Copy main plot
+			self.ax[0].figure.canvas.draw()
+			plot_img = np.array(self.ax[0].figure.canvas.renderer.buffer_rgba())
+			combined_axes[0].imshow(plot_img)
+			combined_axes[0].axis('off')
+			
+			# Copy image grid
+			self.image_fig.canvas.draw()
+			image_img = np.array(self.image_fig.canvas.renderer.buffer_rgba())
+			combined_axes[1].imshow(image_img)
+			combined_axes[1].axis('off')
+
+			# And this final image name also has thumbnails
+			output_filename = output_filename +"_z_"+str(z_a_value)+'_SED_thumbnails.png'
+			
+			combined_fig.tight_layout()
+			combined_fig.savefig(output_filename, dpi = 300)
+			plt.close(combined_fig)
+			print("JADESView Screen saved as "+output_filename)
+		else:
+			combined_fig, combined_axes = plt.subplots(1, 1, figsize=(11, 4))
+			
+			# Copy main plot
+			self.ax[0].figure.canvas.draw()
+			plot_img = np.array(self.ax[0].figure.canvas.renderer.buffer_rgba())
+			combined_axes.imshow(plot_img)
+			combined_axes.axis('off')
 						
-			# Set the color map
-			plt.set_cmap('gray')
-			
-			indexerror = 0		
-			# Normalize the image using the min-max interval and a square root stretch
-			thumbnail = image_cutout.data
-			#start_time = time.time()
-			if (stretch == 'AsinhStretch'):
-				try:
-					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=AsinhStretch())
-				except IndexError:
-					indexerror = 1
-				except UnboundLocalError:
-					indexerror = 1
-			if (stretch == 'LogStretch'):
-				try:
-					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LogStretch(100))
-				except IndexError:
-					indexerror = 1
-				except UnboundLocalError:
-					indexerror = 1
-			if (stretch == 'LinearStretch'):
-				try:
-					norm = ImageNormalize(thumbnail, interval=ZScaleInterval(), stretch=LinearStretch())
-				except IndexError:
-					indexerror = 1
-				except UnboundLocalError:
-					indexerror = 1
-			#end_time = time.time()
-			#print("       Stretching Image: " +str(end_time - start_time))
-			
-			#start_time = time.time()
-			if (all_images_filter_name[i] == 'SEGMAP'):
-				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
-			elif (indexerror == 0):
-				ax3.imshow(thumbnail, origin = 'lower', aspect='equal', norm = norm)
+			# And this final image name does not indicate that there are thumbnails
+			output_filename = output_filename +"_z_"+str(z_a_value)+'_SED.png'
+						
+			combined_fig.tight_layout()
+			combined_fig.savefig(output_filename, dpi = 300)
+			plt.close(combined_fig)
+			print("JADESView Screen saved as "+output_filename)
+		
+	def previous_object(self):
+		object_iterator = np.where(ID_numbers == int(self.id_entry.get()))[0][0]
+		try:
+			if (object_iterator > 0):
+				object_iterator = object_iterator - 1
+				self.id_entry.delete(0, tk.END)  # Delete current text
+				self.id_entry.insert(0,str(ID_numbers[object_iterator])) 
+				self.update_plot()
 			else:
-				ax3.imshow(thumbnail, origin = 'lower', aspect='equal')
-			#end_time = time.time()
-			#print("       Plotting Thumbnail: " +str(end_time - start_time))
+				print("At start of list!")
+		except IndexError:
+			self.id_entry.delete(0, tk.END)  # Delete current text
+			self.id_entry.insert(0,str(ID_numbers[0])) 
+			self.update_plot()
+			print("At start of list!")
+				
+	def next_object(self):
+		#print(int(self.id_entry.get()), np.where(ID_numbers == int(self.id_entry.get())))
+		object_iterator = np.where(ID_numbers == int(self.id_entry.get()))[0][0]
+		try:
+			#print(object_iterator)
+			if (object_iterator < number_objects):
+				object_iterator = object_iterator + 1
+				self.id_entry.delete(0, tk.END)  # Delete current text
+				self.id_entry.insert(0,str(ID_numbers[object_iterator])) 
+				self.update_plot()
+			else:
+				print("At end of list!")
+		except IndexError:
+			self.id_entry.delete(0, tk.END)  # Delete current text
+			self.id_entry.insert(0,str(ID_numbers[-1])) 
+			self.update_plot()
+			print("At end of list!")
+		
+	# Saving the individual thumbnails as fits files for each filter shown. 
+	def save_thumbnails(self):
+		print("Saving thumbnails")
+
+		# Getting the RA/DEC
+		object_ID = int(self.id_entry.get())
+		object_ID_index = np.where(ID_values == object_ID)[0][0]
+		objRA = RA_values[object_ID_index]
+		objDEC = DEC_values[object_ID_index]
+		output_name_stub = str(object_ID)+'_size_'+str(round(float(self.thumbnail_size.get()),1))+'_arcsec'
+
+		# Creating the output folder, if one doesn't exist 
+		output_folder = str(object_ID)+"_Thumbnails"
+		if (os.path.exists(output_folder) == False):
+			os.mkdir(output_folder)
+				
+		for q in range(0, number_images):
+			image_cutout = return_image_cutout(objRA, objDEC, image_hdu_all[q], image_wcs_all[q], float(self.thumbnail_size.get()))
+
+			hdu_cutout = copy.copy(image_hdu_all[q])
 			
-			if (number_images <= 18):
-				if (i <= 5):
-					fig_x, fig_y = (20*sf)+(175*i*sf), 500*sf
-				if ((i > 5) & (i <= 11)):
-					fig_x, fig_y = (20*sf)+(175*(i-6)*sf), 675*sf
-				if ((i > 11) & (i <= 17)):
-					fig_x, fig_y = (20*sf)+(175*(i-12)*sf), 850*sf
-			if ((number_images > 18) & (number_images <= 24)):
-				if (i <= 7):
-					fig_x, fig_y = (20*sf)+(130*i*sf), 500*sf
-				if ((i > 7) & (i <= 15)):
-					fig_x, fig_y = (20*sf)+(130*(i-8)*sf), 675*sf
-				if ((i > 15) & (i <= 23)):
-					fig_x, fig_y = (20*sf)+(130*(i-16)*sf), 850*sf
-			if ((number_images > 24) & (number_images <= 32)):
-				if (i <= 7):
-					fig_x, fig_y = (20*sf)+(130*i*sf), 500*sf
-				if ((i > 7) & (i <= 15)):
-					fig_x, fig_y = (20*sf)+(130*(i-8)*sf), 625*sf
-				if ((i > 15) & (i <= 23)):
-					fig_x, fig_y = (20*sf)+(130*(i-16)*sf), 750*sf
-				if ((i > 23) & (i <= 31)):
-					fig_x, fig_y = (20*sf)+(130*(i-24)*sf), 875*sf
-							
-			# Keep this handle alive, or else figure will disappear
-			fig_photo_objects = np.append(fig_photo_objects, draw_figure(canvas, fig, loc=(fig_x, fig_y)))
-			plt.close('all')
-			end_time = time.time()
-			if (timer_verbose):
-				print("       Plotting Thumbnail: " +str(end_time - start_time))
+			hdu_cutout.data = image_cutout.data
+			hdu_cutout.header.update(image_cutout.wcs.to_header())
+			hdu_cutout.writeto(output_folder+'/'+output_name_stub+'_'+str(all_images_filter_name[q])+'.fits', overwrite = True)
 
-	return fig_photo_objects
+	def open_fitsmap(self):
+		# Getting the RA/DEC
+		object_ID = int(self.id_entry.get())
+		object_ID_index = np.where(ID_values == object_ID)[0][0]
+		objRA = RA_values[object_ID_index]
+		objDEC = DEC_values[object_ID_index]
 
-
-
-def save_destroy():
-	global ID_values
-	global current_index
-	global ID_iterator
-	global highZflag_array
-	global output_flags_file
-	global output_notes_file
-	global e2 
-	
-	if (os.path.exists(output_flags_file)):
-		os.system('rm '+output_flags_file)
-	if (os.path.exists(output_notes_file)):
-		os.system('rm '+output_notes_file)
-
-	# First, let's make the dtype and colnames arrays
-	colnames = np.zeros(4, dtype ='S20')
-	dtype = np.zeros(4, dtype ='str')
-	colnames[0] = 'ID'
-	colnames[1] = 'HighZFlag'
-	colnames[2] = 'BadFitFlag'
-	colnames[3] = 'BadDataFlag'
-	dtype[0] = 'I'
-	dtype[1] = 'I'
-	dtype[2] = 'I'
-	dtype[3] = 'I'
-	
-	# And now let's assemble the data array
-	output_data = np.zeros([number_objects, 4])
-	output_data[:,0] = ID_values
-	output_data[:,1] = highZflag_array
-	output_data[:,2] = badfitflag_array
-	output_data[:,3] = baddataflag_array
-	
-	# And finally, let's write out the output file.
-	outtab = Table(output_data, names=colnames, dtype=dtype)
-	outtab.write(output_flags_file)
-
-	#notes_values[ID_iterator] = e2.get()
-	current_id = ID_list[ID_iterator]
-	notes_values[current_index] = e2.get()
-
-	w = open(output_notes_file, 'a')
-	w.write('#ID    Notes \n')
-	for z in range(0, len(ID_values)):
-		if (notes_values[z] != ''):
-			w.write(str(ID_values[z])+'    '+str(notes_values[z])+'\n')
-	w.close()
-
-	quit()
-	#root.destroy()
-
-def plotbeagle():
-	global e2
-	global ID_iterator
-	global current_index
-	global ID_list
-	global ID_list_indices
-	global photo
-	global new_photo
-	global item4
-	global item5
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-
-	global eazy_positionx, eazy_positiony
-	global eazytext_positionx, eazytext_positiony
-	global beagle_positionx, beagle_positiony
-	global beagletext_positionx, beagletext_positiony
-
-	notes_values[current_index] = e2.get()
-	e2.delete(0,END)
-
-	canvas.delete(item5)
+		base_url = fitsmap_link  # Example base URL
 		
-	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[ID_iterator]
-	e2.insert(0, notes_values[current_index])
-
-	new_image = getBEAGLEimage(current_id)
-	start_time = time.time()
-	new_photo = resizeimage(new_image)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Resizing the BEAGLE image: " +str(end_time - start_time))
-	start_time = time.time()
-	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Creating the BEAGLE canvas: " +str(end_time - start_time))
-	
-	btn13.config(font=('helvetica bold', textsizevalue))
-	btn10.config(font=('helvetica', textsizevalue))
-
-	otherfit_label.configure(text="BEAGLE FIT")  
-	
-def plotbagpipes():
-	global e2
-	global ID_iterator
-	global current_index
-	global ID_list
-	global ID_list_indices
-	global photo
-	global new_photo
-	global item4
-	global item5
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-
-	global bagpipes_positionx, bagpipes_positiony
-
-	notes_values[current_index] = e2.get()
-	e2.delete(0,END)
-
-	if (item5 is not None):
-		canvas.delete(item5)
+		# Construct the full URL with query parameters
+		full_url = base_url.replace("RA_VALUE", str(objRA))
+		full_url = full_url.replace("DEC_VALUE", str(objDEC))
 		
-	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[ID_iterator]
-	e2.insert(0, notes_values[current_index])
+		# Open in the default web browser
+		webbrowser.open(full_url)
 
-	new_image = getBAGPIPESimage(current_id)
-	new_image = cropBAGPIPES(new_image)
-	start_time = time.time()
-	new_photo = resizeBAGPIPESimage(new_image)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Resizing the BAGPIPES image: " +str(end_time - start_time))
-	start_time = time.time()
-	item5 = canvas.create_image(bagpipes_positionx, bagpipes_positiony, image=new_photo)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Creating the BAGPIPES canvas: " +str(end_time - start_time))
+	def on_plot_click(self, event):
+		# Check if the click is in the right plot
+		if event.inaxes == self.ax[1]: 
+			# Ensure click is within the axes
+			if event.xdata is not None:  
+				# Get X coordinate
+				clicked_x = event.xdata 
+				# Pass to click handler function
+				self.handle_x_click(clicked_x)  
 
-	btn10.config(font=('helvetica bold', textsizevalue))
-	btn13.config(font=('helvetica', textsizevalue))
-
-	otherfit_label.configure(text="BAGPIPES FIT")  
-
-def plotsedz():
-	global e2
-	global ID_iterator
-	global current_index
-	global ID_list
-	global ID_list_indices
-	global photo
-	global new_photo
-	global item4
-	global item5
-	global canvas   
-	global fig_photo_objects
-	global defaultstretch
-
-	global eazy_positionx, eazy_positiony
-	global eazytext_positionx, eazytext_positiony
-	global beagle_positionx, beagle_positiony
-	global beagletext_positionx, beagletext_positiony
-
-	notes_values[current_index] = e2.get()
-	e2.delete(0,END)
-
-	canvas.delete(item5)
-		
-	current_index = ID_list_indices[ID_iterator]
-	current_id = ID_list[ID_iterator]
-	e2.insert(0, notes_values[current_index])
-
-	new_image = getSEDzimage(current_id)
-	start_time = time.time()
-	new_photo = resizeimage(new_image)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Resizing the SEDz image: " +str(end_time - start_time))
-	start_time = time.time()
-	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-	end_time = time.time()
-	if (timer_verbose):
-		print("Creating the SEDz canvas: " +str(end_time - start_time))
-
-	#btn9.config(font=('helvetica', textsizevalue))
-	#btn11.config(font=('helvetica bold', textsizevalue))
+	def handle_x_click(self, x_value):
+		# Example action: update a label or print
+		self.altz_entry.delete(0, tk.END)
+		self.altz_entry.insert(0, f"{x_value:.2f}")
+		self.update_plot()
+       
+	def quit_program(self):
+		sys.exit()
 
 
-def getfile_value(current_id, results_IDs, results_values, round_value):
-	find_value_index = np.where(results_IDs == current_id)[0]
-	if (len(find_value_index) > 0):
-		return round(results_values[find_value_index[0]],round_value)
-	else:
-		return -9999
-
-def getfile_true_or_false(current_id, results_IDs, results_values):
-	find_value_index = np.where(results_IDs == current_id)[0]
-	if (len(find_value_index) > 0):
-		return results_values[find_value_index[0]] 
-	else:
-		return False
-
-def get_fitsmap_link(fitsmap_link, objID, ID_values, RA_values, DEC_values):
-	
-	RA_object = RA_values[np.where(ID_values == objID)[0][0]]
-	DEC_object = DEC_values[np.where(ID_values == objID)[0][0]]
-	
-	fitsmap_link = fitsmap_link.replace("RA_REPLACE", str(RA_object))
-	fitsmap_link = fitsmap_link.replace("DEC_REPLACE", str(DEC_object))
-	return fitsmap_link
-
+######################
+#     Arguments      #
+######################
 
 parser = argparse.ArgumentParser()
 
-######################
-# Optional Arguments #
-######################
-
-# JADESView Input File
+# Redshift list
 parser.add_argument(
-  '-input',
-  help="JADESView Input File?",
+  '-jv_params','--jv_params',
+  help="JADESView input parameter file",
   action="store",
   type=str,
-  dest="input",
+  dest="JADESView_input_file",
+  required=True
+)
+# Redshift list
+parser.add_argument(
+  '-zlist','--z_number_list',
+  help="List of ID numbers and redshfits for a subsample?",
+  action="store",
+  type=str,
+  dest="z_number_list",
   required=False
 )
 
-
 # ID number
 parser.add_argument(
-  '-id',
+  '-id','--id_number',
   help="ID Number?",
   action="store",
   type=int,
@@ -1105,7 +1040,7 @@ parser.add_argument(
 
 # ID list
 parser.add_argument(
-  '-idlist',
+  '-idlist','--id_number_list',
   help="List of ID Numbers?",
   action="store",
   type=str,
@@ -1123,643 +1058,542 @@ parser.add_argument(
   required=False
 )
 
-# Timer Verbose
-parser.add_argument(
-  '-tverb',
-  help="Print timer values?",
-  action="store",
-  type=str,
-  dest="tverb",
-  required=False
-)
-
 
 args=parser.parse_args()
 
-if (args.input):
-	JADESView_input_file = args.input
+if __name__ == '__main__':
 
-timer_verbose = False
-if (args.tverb):
-	timer_verbose = True
+	# Read in the various input values from the input file. 
+	input_lines = np.loadtxt(args.JADESView_input_file, dtype='str')
+	number_input_lines = len(input_lines[:,0])
+	for i in range(0, number_input_lines):
 
-
-# Right now, the default canvaswidth is 2000. 
-canvaswidth = 2000
-
-# I have to set these as false unless the file is specified in the input file
-EAZY_plots_exist = False
-EAZY_results_file_exists = False
-BEAGLE_plots_exist = False
-BEAGLE_results_file_exists = False
-BAGPIPES_plots_exist = False
-BAGPIPES_results_file_exists = False
-NN_results_file_exists = False
-color_selection_results_file_exists = False
-fitsmap_link_exists = False
-
-# Read in the various input values from the input file. 
-input_lines = np.loadtxt(JADESView_input_file, dtype='str')
-number_input_lines = len(input_lines[:,0])
-for i in range(0, number_input_lines):
-	if (input_lines[i,0] == 'input_photometry'):
-		input_photometry = input_lines[i,1]
-	if (input_lines[i,0] == 'image_list'):
-		all_images_file_name = input_lines[i,1]
-	if (input_lines[i,0] == 'EAZY_files'):
-		EAZY_files = input_lines[i,1]
-		EAZY_plots_exist = True
-	if (input_lines[i,0] == 'EAZY_results'):
-		EAZY_results_file = input_lines[i,1]
-		EAZY_results_file_exists = True
-		EAZY_results_file_exists = os.path.exists(EAZY_results_file)
-	if (input_lines[i,0] == 'BEAGLE_files'):
-		BEAGLE_files = input_lines[i,1]
-		BEAGLE_plots_exist = True
-	if (input_lines[i,0] == 'BEAGLE_results'):
-		BEAGLE_results_file = input_lines[i,1]
-		BEAGLE_results_file_exists = True
-		BEAGLE_results_file_exists = os.path.exists(BEAGLE_results_file)
-	if (input_lines[i,0] == 'BAGPIPES_files'):
-		BAGPIPES_files = input_lines[i,1]
-		BAGPIPES_plots_exist = True
-	if (input_lines[i,0] == 'BAGPIPES_results'):
-		BAGPIPES_results_file = input_lines[i,1]
-		BAGPIPES_results_file_exists = True
-		BAGPIPES_results_file_exists = os.path.exists(BAGPIPES_results_file)
-	if (input_lines[i,0] == 'SEDz_files'):
-		SEDz_files = input_lines[i,1]
-	if (input_lines[i,0] == 'NN_results'):
-		NN_results_file = input_lines[i,1]
-		NN_results_file_exists = True
-		NN_results_file_exists = os.path.exists(NN_results_file)
-	if (input_lines[i,0] == 'color_selection_results'):
-		color_selection_results_file = input_lines[i,1]
-		color_selection_results_file_exists = True
-		color_selection_results_file_exists = os.path.exists(color_selection_results_file)
-	if (input_lines[i,0] == 'output_flags_file'):
-		output_flags_file = input_lines[i,1]
-	if (input_lines[i,0] == 'output_notes_file'):
-		output_notes_file = input_lines[i,1]
-	if (input_lines[i,0] == 'canvaswidth'):
-		canvaswidth = float(input_lines[i,1])
-	if (input_lines[i,0] == 'defaultstretch'):
-		defaultstretch = input_lines[i,1]
-	if (input_lines[i,0] == 'ra_dec_size_value'):
-		ra_dec_size_value = float(input_lines[i,1])
-	if (input_lines[i,0] == 'fenrir_username'):
-		fenrir_username = input_lines[i,1]
-	if (input_lines[i,0] == 'fenrir_password'):
-		fenrir_password = input_lines[i,1]
-	if (input_lines[i,0] == 'fitsmap_link'):
-		fitsmap_link = input_lines[i,1]
-		fitsmap_link_exists = True
-
-#base64string = base64.b64encode('%s:%s' % (fenrir_username, fenrir_password))
-
-# # # # # # # # # # # # # # # # # # 
-# Let's open up all the input files
-
-# Open up the image list file
-images_all_txt = np.loadtxt(all_images_file_name, dtype='str')
-if (len(images_all_txt[0]) > 2):
-	# First, if the user specifies where the science data extension is, they'll put 
-	# them in the second column.
-	all_images_filter_name = images_all_txt[:,0]
-	all_image_extension_number = images_all_txt[:,1].astype('int')
-	all_image_paths = images_all_txt[:,2]
-else:
-	# Here, we assume that the science extension is 1 
-	all_images_filter_name = images_all_txt[:,0]
-	all_image_extension_number = np.zeros(len(all_images_filter_name))+1
-	all_image_paths = images_all_txt[:,1]
-
-number_image_filters = len(all_images_filter_name)
-number_images = len(all_image_paths)
-
-# astropy.io.fits.open(...,memmap='True',lazy_load_hdus='True')
-
-image_all = np.empty(0)
-image_hdu_all = np.empty(0)
-image_wcs_all = np.empty(0)
-for i in range(0, number_images):
-	print("Opening up image: "+all_image_paths[i])
-	if (all_image_paths[i] == 'NoImage'):
-		all_image_paths[i] = 'NoImage.fits'
-	image_all = np.append(image_all, fits.open(all_image_paths[i]))
-	try:
-		#image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[1])
-		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[all_image_extension_number[i]])
-	except IndexError:
-		#print('IndexError')
-		image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
-		#print('Running fits.open('+str(all_image_paths[i])+')')
-	#print('Running WCS(image_hdu_all[i].header)')
-	image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
-
-
-sf = canvaswidth / 2000.0 # This is the "shrinkfactor" by which all of the canvas
-                          # element positions and sizes are shrunk or expanded. I 
-                          # RECOGNIZE THAT I SHOULD PUT THINGS ON A GRID, BUT THAT
-                          # WILL COME IN A FUTURE UPDATE, OK
-
-# The fontsize depends on this
-fontsize = str(int(20*sf))
-
-canvasheight = (canvaswidth*(1.0 / 1.8))  # For showing the various results on the figure, 
-										   # I lock everything to a 1.8:1 aspect ratio
-
-baseplotwidth = int(1000*sf)
-BAGPIPESbaseplotwidth = int(800*sf)
-textsizevalue = int(20*sf)
-thumbnailsize = 1.5*sf
-
-toprow_y = 1020
-bottomrow_y = 1060
-
-# However, if we get a lot of thumbnails, I might want to change things a bit
-if ((number_images > 18) & (number_images <= 32)):
-	toprow_y = 1020
-	bottomrow_y = 1060
-	thumbnailsize = 1.2*sf
-
-# These do not change depending on the number of images we have.
-eazy_positionx, eazy_positiony = 500*sf, 245*sf
-eazytext_positionx, eazytext_positiony = 820*sf, 10*sf
-beagle_positionx, beagle_positiony = 1500*sf, 350*sf
-beagletext_positionx, beagletext_positiony = 1780*sf, 10*sf#1300*sf, 70*sf
-bagpipes_positionx, bagpipes_positiony = 1490*sf, 330*sf#1490*sf, 275*sf
-objectID_positionx, objectID_positiony = 20*sf, 10*sf#1300*sf, 70*sf
-
-# Open up the photometric catalog
-fitsinput = fits.open(input_photometry)
-ID_values = fitsinput[1].data['ID'].astype('int')
-RA_values = fitsinput[1].data['RA']
-DEC_values = fitsinput[1].data['DEC']
-number_objects = len(ID_values)
-
-image_flux_value_cat = np.zeros([number_objects, number_image_filters])
-image_flux_value_err_cat = np.zeros([number_objects, number_image_filters])
-SNR_values = np.zeros([number_objects, number_image_filters])
-
-for j in range(0, number_image_filters):
-	try:
-		image_flux_value_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]]
-		image_flux_value_err_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]+'_err']
-		SNR_values[:,j] = image_flux_value_cat[:,j] / image_flux_value_err_cat[:,j]
-
-	except:		
-		#if (all_images_filter_name[j] == 'SEGMAP'):
-		SNR_values[:,j] = -9999
-#		
-#	else:
-#		image_flux_value_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]]
-#		image_flux_value_err_cat[:,j] = fitsinput[1].data[all_images_filter_name[j]+'_err']
-#		SNR_values[:,j] = image_flux_value_cat[:,j] / image_flux_value_err_cat[:,j]
-
-number_input_objects = len(ID_values)
-ID_iterator = 0
-
-if (EAZY_results_file_exists):
-	if (EAZY_results_file.startswith('http')):
-		response = requests.get(EAZY_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		eazy_fits_file = BytesIO(response.content)
-	else:
-		eazy_fits_file = EAZY_results_file
-	eazy_results_fits = fits.open(eazy_fits_file)
-	eazy_results_IDs = eazy_results_fits[1].data['ID'].astype('int')
-	eazy_results_zpeak = eazy_results_fits[1].data['z_peak']
-	eazy_results_za = eazy_results_fits[1].data['z_a']
-	eazy_results_zl68 = eazy_results_fits[1].data['l68']
-	eazy_results_zu68 = eazy_results_fits[1].data['u68']
-	#eazy_results_zl95 = eazy_results_fits[1].data['l95']
-	#eazy_results_zu95 = eazy_results_fits[1].data['u95']
-
-
-if (BEAGLE_results_file_exists):
-	if (BEAGLE_results_file.startswith('http')):
-		response = requests.get(BEAGLE_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		beagle_fits_file = BytesIO(response.content)
-	else:
-		beagle_fits_file = BEAGLE_results_file
+		# ANCILLARY FILE FOLDER
+		# Ancillary file folder
+		if (input_lines[i,0] == 'ancillary_files'):
+			ancillary_file_folder = input_lines[i,1]
 		
-	beagle_results_fits = fits.open(beagle_fits_file)
-	beagle_ID_str = beagle_results_fits[1].data['ID']
-	beagle_results_IDs = np.zeros(len(beagle_ID_str), dtype = 'int')
-	for j in range(0, len(beagle_ID_str)):
-		beagle_results_IDs[j] = int(beagle_ID_str[j])
+		# CATALOG PARAMETERS
+		# input photometry catalog
+		if (input_lines[i,0] == 'input_photometry'):
+			args_input_file = input_lines[i,1]
+		# Convolved photometry? 
+		if (input_lines[i,0] == 'convolved'):
+			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
+				default_convolved = True
+			else:
+				default_convolved = False
+		# Which aperture to use?
+		if (input_lines[i,0] == 'aperture'):
+			args_aperture = input_lines[i,1]
+		# Which uncertainty values to use?
+		if (input_lines[i,0] == 'uncertainty'):
+			default_uncertainty = input_lines[i,1]
+		# Which filters to use? 
+		if (input_lines[i,0] == 'filters'):
+			args_filters = input_lines[i,1]
+		# Value of minimum relative error to use in fit?
+		if (input_lines[i,0] == 'min_rel_err'):
+			args_min_rel_err = float(input_lines[i,1])
 
-	beagle_results_zavg = beagle_results_fits[1].data['redshift_beagle_mean']
-	beagle_results_redshift_1 = beagle_results_fits[1].data['redshift_beagle_1']
-	beagle_results_redshift_err_1 = beagle_results_fits[1].data['redshift_beagle_err_1']
-	beagle_results_redshift_2 = beagle_results_fits[1].data['redshift_beagle_2']
-	beagle_results_redshift_err_2 = beagle_results_fits[1].data['redshift_beagle_err_2']
-	beagle_results_zl68 = beagle_results_fits[1].data['redshift_68.0_low']
-	beagle_results_zu68 = beagle_results_fits[1].data['redshift_68.0_up']
-	beagle_results_Pzgt2p0 = beagle_results_fits[1].data['redshift_p_gt_2.0']
-	beagle_results_Pzgt4p0 = beagle_results_fits[1].data['redshift_p_gt_4.0']
-	beagle_results_Pzgt6p0 = beagle_results_fits[1].data['redshift_p_gt_6.0']
+		# EAZY PARAMETERS
+		# zphot.zeropoint file location
+		if (input_lines[i,0] == 'zeropoint'):
+			args_zeropoint_filename = input_lines[i,1]
+		# template set to use
+		if (input_lines[i,0] == 'templates'):
+			args_template_param = input_lines[i,1]
+		# tempfilt.pkl file (for speeding up the code)
+		if (input_lines[i,0] == 'tempfilt'):
+			args_tempfilt_filename = input_lines[i,1]
+		# Number of cores to use for the EAZY fits
+		if (input_lines[i,0] == 'eazy_ncores'):
+			args_ezp = int(input_lines[i,1])
+		# Flag to use the Asada+24 CGM prescription
+		if (input_lines[i,0] == 'asada_cgm'):
+			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
+				args_asada_cgm = True
+			else:
+				args_asada_cgm = False
+		# Fix the redshift to z_spec
+		if (input_lines[i,0] == 'fix_zspec'):
+			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
+				fix_zspec = True
+			else:
+				fix_zspec = False
+		
+		# input list of image files for creating thumbnails
+		if (input_lines[i,0] == 'image_list'):
+			all_images_file_name = input_lines[i,1]
+		# and, if you want to make thumbnails, setting this flag
+		if (input_lines[i,0] == 'plot_thumbnails'):
+			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
+				args_plot_thumbnails = True
+			else:
+				args_plot_thumbnails = False
+		# the size of the thumbnails, in arcseconds
+		if (input_lines[i,0] == 'ra_dec_size_value'):
+			ra_dec_size_value = float(input_lines[i,1])
 
-if (NN_results_file_exists):
-	if (NN_results_file.startswith('http')):
-		response = requests.get(NN_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		NN_fits_file = BytesIO(response.content)
-	else:
-		NN_fits_file = NN_results_file
+		# the raw fitsmap link
+		if (input_lines[i,0] == 'fitsmap_link'):
+			fitsmap_link = input_lines[i,1]
+			fitsmap_link_exists = True
 
-	NN_results_fits = fits.open(NN_fits_file)
-	NN_results_IDs = NN_results_fits[1].data['ID_PHOTOMETRIC'].astype('int')
-	NN_results_zpred = NN_results_fits[1].data['pred_z']
-	NN_results_zspec = NN_results_fits[1].data['true_z']
-	NN_results_use = NN_results_fits[1].data['USE']
+	# CHECKING IF THE FILES EXIST
+	# Checking whether the ancillary file folder exists
+	if (os.path.isdir(ancillary_file_folder) == False):
+		sys.exit("Ancillary file folder doesn't exist: "+ancillary_file_folder)
 
-if (color_selection_results_file_exists):
-	if (color_selection_results_file.startswith('http')):
-		response = requests.get(color_selection_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		color_selection_file = BytesIO(response.content)
-	else:
-		color_selection_file = color_selection_results_file
+	# Checking whether the input photometry file exists
+	if (os.path.isfile(args_input_file) == False):
+		if (os.path.isfile(ancillary_file_folder+'/'+args_input_file) == False):
+			sys.exit("Input photometry file doesn't exist: "+args_input_file)
 
-	color_selection_fits = fits.open(color_selection_file)
-	color_selection_IDs = color_selection_fits[1].data['ID'].astype('int')
-	color_selection_F090W_dropouts = color_selection_fits[1].data['NRC_F090W_Dropout_SNR3.0']
-	color_selection_F115W_dropouts = color_selection_fits[1].data['NRC_F115W_Dropout_SNR3.0']
-	color_selection_F150W_dropouts = color_selection_fits[1].data['NRC_F150W_Dropout_SNR3.0']
+	# Checking whether the filter file exists. It can be linked directly,
+	# or placed in the ancillary file folder
+	if (os.path.isfile(args_filters) == False):
+		if (os.path.isfile(ancillary_file_folder+'/'+args_filters) == False):
+			sys.exit("Filters file doesn't exist: "+args_filters)
+		else:
+			args_filters = ancillary_file_folder+'/'+args_filters
 
-if (BAGPIPES_results_file_exists):
-	if (BAGPIPES_results_file.startswith('http')):
-		response = requests.get(BAGPIPES_results_file, auth=HTTPBasicAuth(fenrir_username, fenrir_password))
-		BAGPIPES_fits_file = BytesIO(response.content)
-	else:
-		BAGPIPES_fits_file = BAGPIPES_results_file
+	# Checking whether the template file exists. It can be linked directly,
+	# or placed in the ancillary file folder
+	if (os.path.isfile(args_template_param) == False):
+		if (os.path.isfile(ancillary_file_folder+'/templates/'+args_template_param) == False):
+			sys.exit("Template file doesn't exist: "+args_template_param)
+		else:
+			args_template_param = ancillary_file_folder+'/templates/'+args_template_param
 
-	BAGPIPES_results_fits = fits.open(BAGPIPES_fits_file)
-	BAGPIPES_results_IDs = BAGPIPES_results_fits[1].data['ID'].astype('int')
-	BAGPIPES_results_zphot = BAGPIPES_results_fits[1].data['redshift_mean']
+	# The tempfilt filen is not necessary for running the program, but this allows
+	# it to be either in the ancillary file folder, or you can point somewhere else.
+	if (os.path.isfile(args_tempfilt_filename) == False):
+		if (os.path.isfile(ancillary_file_folder+'/'+args_tempfilt_filename) == True):
+			args_tempfilt_filename = ancillary_file_folder + '/' + args_tempfilt_filename
+
+	# The zeropoint filename is not necessary for running the program, but this allows
+	# it to be either in the ancillary file folder, or you can point somewhere else.
+	if (os.path.isfile(args_zeropoint_filename) == False):
+		if (os.path.isfile(ancillary_file_folder+'/'+args_zeropoint_filename) == True):
+			args_zeropoint_filename = ancillary_file_folder + '/' + args_zeropoint_filename
+	
+	if (args_plot_thumbnails == True):
+		# Checking whether the image list file exists. It can be linked directly,
+		# or placed in the ancillary file folder
+		if (os.path.isfile(all_images_file_name) == False):
+			if (os.path.isfile(ancillary_file_folder+'/'+all_images_file_name) == False):
+				sys.exit("Image list file doesn't exist: "+all_images_file_name)
+			else:
+				all_images_file_name = ancillary_file_folder+'/'+all_images_file_name
+	
+	
+	# If you have a tempfilt.pkl file, you need to import pickle
+	if (args_tempfilt_filename):
+		import pickle
+	
+	# The EAZY input file for running the fits		
+	EAZY_output_filename = 'EAZY_input_JADESView.dat'
+
+
+	all_filters_file_name = ancillary_file_folder+'/JADES_All_Filters_EAZYpy.dat'
+	filters_all = np.loadtxt(all_filters_file_name, dtype='str')
+	all_filters = filters_all[:,0]
+	eazy_filter_numbers = filters_all[:,1]
+	all_filter_numbers = filters_all[:,1]
+	all_header_filters = filters_all[:,2]
+	all_filter_waves = filters_all[:,3]
+	all_filter_waves = all_filter_waves.astype(float)
+	all_filter_bw = filters_all[:,4]
+	all_filter_bw = all_filter_bw.astype(float)
+	total_all_jades_filters = len(all_filters)
+
+	# Open up the filter file specified by the user. 
+	filter_file_name = args_filters
+	filters_file = np.loadtxt(filter_file_name, dtype='str')
+	filters = filters_file
+	number_filters = len(filters)
+	
+	filter_numbers = np.zeros(number_filters, dtype = int)
+	old_eazy_filter_numbers = np.zeros(number_filters, dtype = int)
+	header_filters = np.zeros(number_filters, dtype = '|U30')
+	short_filters = np.zeros(number_filters, dtype = '|U30')
+	filter_waves = np.zeros(number_filters)
+	filter_bw = np.zeros(number_filters)
+	color_filters = np.zeros(number_filters, dtype = 'U10')
+	for n in range(0, number_filters):
+		filter_index = np.where(all_filters == filters[n])[0][0]
+		header_filters[n] = all_header_filters[filter_index]
+		short_filters[n] = all_header_filters[filter_index].replace('HST_','').replace('NRC_','').replace('MIRI_','')
+		filter_numbers[n] = all_filter_numbers[filter_index]
+		old_eazy_filter_numbers[n] = eazy_filter_numbers[filter_index]
+		filter_waves[n] = all_filter_waves[filter_index]
+		filter_bw[n] = all_filter_bw[filter_index]
+	
+		if (header_filters[n].startswith('HST')):
+			color_filters[n] = HST_photometry_color
+		else:
+			color_filters[n] = NIRC_photometry_color
+			
+	if (args_plot_thumbnails):
+		
+		# Open up the image list file
+		#all_images_file_name = args.image_list
+		images_all_txt = np.loadtxt(all_images_file_name, dtype='str')
+		if (len(images_all_txt[0]) > 2):
+			# First, if the user specifies where the science data extension is, they'll put 
+			# them in the second column.
+			all_images_filter_name = images_all_txt[:,0]
+			all_image_extension_number = images_all_txt[:,1].astype('int')
+			all_image_paths = images_all_txt[:,2]
+		else:
+			# Here, we assume that the science extension is 1 
+			all_images_filter_name = images_all_txt[:,0]
+			all_image_extension_number = np.zeros(len(all_images_filter_name))+1
+			all_image_paths = images_all_txt[:,1]
+		
+		number_image_filters = len(all_images_filter_name)
+		number_images = len(all_image_paths)
+		
+		image_all = np.empty(0)
+		image_hdu_all = np.empty(0)
+		image_wcs_all = np.empty(0)
+	
+		image_short_filters = np.zeros(number_image_filters, dtype = '|U30')
+		for i in range(0, number_images):
+			image_filter_index = np.where(all_filters == all_images_filter_name[i])[0][0]
+	
+			image_short_filters[i] = all_header_filters[image_filter_index].replace('HST_','').replace('NRC_','').replace('MIRI_','')
+	
+			print("Opening up image: "+all_image_paths[i])
+			if (all_image_paths[i] == 'NoImage'):
+				all_image_paths[i] = 'NoImage.fits'
+			image_all = np.append(image_all, fits.open(all_image_paths[i]))
+			try:
+				image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[all_image_extension_number[i]])
+			except IndexError:
+				print('IndexError')
+				image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
+				print('Running fits.open('+str(all_image_paths[i])+')')
+	
+			image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
+			
+	print("Opening up Noisy Photometry")
+		
+	# Now, go from the raw catalog file to the fluxes/errors being explored. 
+	ID_values, fluxes_all, errors_all, RA_values, DEC_values = RawCatalog_To_Fluxes_Errs_RA_DEC(args_input_file, short_filters, False, default_convolved, args_aperture, default_uncertainty)
+	redshifts = np.zeros(len(ID_values))-9999.0
+	number_objects = ID_values.size
+
+	flux_value_cat = fluxes_all
+	flux_value_err_cat = errors_all 
+	
+	if (args_min_rel_err):
+		print("Setting minimum relative error.")
+		for n in range(0, number_filters):
+			for j in range(0, number_objects):
+				if ((errors_all[j,n] > 0) & (fluxes_all[j,n] > 0)):
+					if ((errors_all[j,n] / fluxes_all[j,n]) < args_min_rel_err):
+						errors_all[j,n] = args_min_rel_err * fluxes_all[j,n]
+
+	if (args_plot_thumbnails):
+		print("Getting SNR values for the image photometry.")
+		image_ID_values, image_flux_value_cat, image_flux_value_err_cat, image_RA_values, image_DEC_values = RawCatalog_To_Fluxes_Errs_RA_DEC(args_input_file, image_short_filters, False, default_convolved, args_aperture, default_uncertainty)
+	
+		SNR_values = np.zeros([number_objects, number_image_filters])
+	
+		for j in range(0, number_image_filters):
+			
+			SNR_values[:,j] = image_flux_value_cat[:,j] / image_flux_value_err_cat[:,j]
+			SNR_values[np.argwhere(image_flux_value_err_cat[:,j] < 0),j] = -9999
+			SNR_values[np.argwhere(np.isnan(image_flux_value_err_cat[:,j])),j] = -9999
 
 	
-# Decide whether or not the user requested an ID number or an id number list
-if (args.id_number):
-	ID_list = ID_values
-	ID_list_indices = np.arange(len(ID_values), dtype = int)
-	current_id = int(args.id_number)
-	current_index = np.where(ID_values == current_id)[0][0]
-	ID_iterator = current_index
-	if (args.id_number_list):
-		print("You can't specify an individual ID and a list, ignoring the list.")
-	if (args.idarglist):
-		print("You can't specify an individual ID and a list, ignoring the list.")
-	
-if not (args.id_number):
-	if not (args.id_number_list):
-		ID_list = ID_values
-		ID_list_indices = np.arange(len(ID_values), dtype = int)
-		current_index = ID_list_indices[ID_iterator]
-		current_id = ID_list[current_index]
-
+	# Create a subsample given an ID number list
+	print("Creating ID list subsample.")
 	if (args.id_number_list):
 		ID_input_file = np.loadtxt(args.id_number_list)
 		if (len(ID_input_file.shape) > 1):
-			ID_numbers_to_view = ID_input_file[:,0].astype(int)
+			subsample_ID_numbers = ID_input_file[:,0].astype(int)
 		else:
-			ID_numbers_to_view = ID_input_file.astype(int)
-		number_id_list = len(ID_numbers_to_view)
+			subsample_ID_numbers = ID_input_file.astype(int)
+		#ID_numbers = ID_input_file
+		number_subsample_objects = len(subsample_ID_numbers)
 	
-		# Set up index array for 
-		ID_list_indices = np.zeros(number_id_list, dtype = int)
-		for x in range(0, number_id_list):
-			ID_list_indices[x] = np.where(ID_values == ID_numbers_to_view[x])[0]
+		subsample_id_index = np.zeros(number_subsample_objects, dtype = 'int')
+		for j in range(0, number_subsample_objects):
+			#print(subsample_ID_numbers[j])
+			subsample_id_index[j] = np.where(ID_values == subsample_ID_numbers[j])[0][0]
+		
+		ID_numbers = ID_values[subsample_id_index]
+		#ID_values = ID_values[subsample_id_index]
+		redshifts = redshifts[subsample_id_index]
+		fluxes_all = fluxes_all[subsample_id_index,:]
+		errors_all = errors_all[subsample_id_index,:]
+		
+		number_objects = len(ID_numbers)
 	
-		ID_list = ID_numbers_to_view
-		current_index = ID_list_indices[ID_iterator]
-		current_id = ID_values[current_index]
-
+	if (args.id_number):
+		ID_numbers = np.zeros(1, dtype = int)
+		ID_numbers[0] = int(args.id_number)
+		#number_input_objects = len(ID_numbers)
+		if (args.id_number_list):
+			"You can't specify an individual ID and a list, ignoring the list."
+	
+		subsample_id_index = np.where(ID_values == int(args.id_number))[0][0]
+		redshifts = np.array([redshifts[subsample_id_index]])
+		fluxes_all = fluxes_all[subsample_id_index,:]
+		errors_all = errors_all[subsample_id_index,:]
+		
+		number_objects = 1
+		
 	if (args.idarglist):
-		ID_numbers_to_view = np.array(ast.literal_eval(args.idarglist))
+		ID_numbers = np.array(ast.literal_eval(args.idarglist))
+		number_input_objects = len(ID_numbers)
+
+		subsample_id_index = np.zeros(number_input_objects, dtype = 'int')
+		for j in range(0, number_input_objects):
+			subsample_id_index[j] = np.where(ID_values == ID_numbers[j])[0][0]
+		
+		#ID_values = ID_values[subsample_id_index]
+		redshifts = redshifts[subsample_id_index]
+		fluxes_all = fluxes_all[subsample_id_index,:]
+		errors_all = errors_all[subsample_id_index,:]
+		
+		number_objects = len(ID_numbers)
+
+	if not (args.id_number or args.idarglist):
+		if not (args.id_number_list):
+			if not (args.z_number_list):
+				sys.exit("Need to specify an ID number or a list of ID numbers!")
+
+	if (args.z_number_list):
+		subsample_ID_numbers = np.loadtxt(args.z_number_list)[:,0]
+		redshifts = np.loadtxt(args.z_number_list)[:,1]
+		number_subsample_objects = len(subsample_ID_numbers)
+
+		subsample_id_index = np.zeros(number_subsample_objects, dtype = 'int')
+		for j in range(0, number_subsample_objects):
+			subsample_id_index[j] = np.where(ID_values == subsample_ID_numbers[j])[0][0]
+		
+		ID_numbers = ID_values[subsample_id_index]
+		fluxes_all = fluxes_all[subsample_id_index,:]
+		errors_all = errors_all[subsample_id_index,:]
+		
+		number_objects = len(ID_numbers)
+
+	number_input_objects = len(ID_numbers)	
 	
-		number_id_list = len(ID_numbers_to_view)
+	print('Making EAZY file!')
 	
-		# Set up index array for 
-		ID_list_indices = np.zeros(number_id_list, dtype = int)
-		for x in range(0, number_id_list):
-			#print(np.where(ID_values == ID_numbers_to_view[x])[0])
-			#print(len(np.where(ID_values == ID_numbers_to_view[x])[0]))
-			if (len(np.where(ID_values == ID_numbers_to_view[x])[0]) > 0):
-				ID_list_indices[x] = np.where(ID_values == ID_numbers_to_view[x])[0]
+	# Create the EAZY input photometry file. 
+	# Write the first two lines of the file
+	f = open(EAZY_output_filename, 'w')
+	f.write('# id z_spec ')
+	for n in range(0, number_filters):
+		f.write('f_'+filters[n]+' e_'+filters[n]+' ')
+	f.write(' \n')
+		
+	f.write('# id z_spec ')
+	for n in range(0, number_filters):
+		f.write('F'+str(filter_numbers[n])+' E'+str(filter_numbers[n])+' ')
+	f.write(' \n')
+	
+	# Write out the data 
+	for j in range(0, number_objects):
+		f.write(str(int(ID_numbers[j]))+' '+str(redshifts[j])+' ')
+		for n in range(0, number_filters):
+			if (number_input_objects == 1):
+				f.write(str(fluxes_all[n])+' '+str(errors_all[n])+' ')
 			else:
-				sys.exit("Object "+str(ID_numbers_to_view[x])+" does not appear in this catalog. Exiting.")
-					
-		ID_list = ID_numbers_to_view
-		current_index = ID_list_indices[ID_iterator]
-		current_id = ID_values[current_index]
-
-
-# Create the notes array
-notes_values = np.array([''], dtype = 'object')
-for x in range(0, number_input_objects-1):
-	notes_values = np.append(notes_values, ['']) 
-
-# Create the flag arrays
-highZflag_array = np.zeros(number_input_objects, dtype = 'int')
-badfitflag_array = np.zeros(number_input_objects, dtype = 'int')
-baddataflag_array = np.zeros(number_input_objects, dtype = 'int')
-
-# So, now, there are three arrays:
-#   ID_list (which is the list of the ID values that will be viewed)
-#   ID_list_indices (which is the indices for the ID values that will be viewed)
-
-# There is also a:
-#   current_id - the current ID number being displayed
-#   current_index - the current index in the full photometric array 
-#   ID_iterator - an iterator that keeps track of the index of the ID_list_indices array
-#                 is currently being shown
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# Now, everything is set up, so let's start creating the GUI
-
-# Start by creating the GUI as root
-root=Tk()
-root.wm_title("JADESView")
-
-# Create the canvas 
-canvas=Canvas(root, height=canvasheight, width=canvaswidth, bg="#ffffff")
-
-# Plot the EAZY SED
-#image = Image.open(EAZY_files+str(current_id)+"_EAZY_SED.png")
-image = getEAZYimage(current_id)
-
-# Put the object label 
-object_label = Label(root, text="Object "+str(current_id), font = "Helvetica "+str(int(textsizevalue*1.5)), fg="black", bg="white")
-object_label.place(x=objectID_positionx, y = objectID_positiony)
-
-# Crop out the thumbnails
-if (EAZY_plots_exist == True):
-	image = cropEAZY(image)
-	photo = resizeimage(image)
-	item4 = canvas.create_image(eazy_positionx, eazy_positiony, image=photo)
-	Label(root, text="EAZY FIT", fg='black', bg='white', font=('helvetica', int(textsizevalue*1.5))).place(x=eazytext_positionx, y = eazytext_positiony)
-else:
-	item4 = None
-
-# Plot the BEAGLE SED
-#new_image = Image.open(BEAGLE_files+str(current_id)+"_BEAGLE_SED.png")
-if (BEAGLE_plots_exist == True):
-	new_image = getBEAGLEimage(current_id)
-	new_photo = resizeimage(new_image)
-	item5 = canvas.create_image(beagle_positionx, beagle_positiony, image=new_photo)
-	otherfit_label = Label(root, text="BEAGLE FIT ", font = "Helvetica "+str(int(textsizevalue*1.5)), fg="black", bg="white")
-	otherfit_label.place(x=beagletext_positionx, y = beagletext_positiony)
-
-else:
-	item5 = None
-
-canvas.pack(side = TOP, expand=True, fill=BOTH)
-
-# Plot the thumbnails
-fig_photo_objects = np.empty(0, dtype = 'object')
-fig_photo_objects = create_thumbnails(canvas, fig_photo_objects, current_id, current_index, defaultstretch)
-
-# # # # # # # # # # # # # # 
-# Place Labels with Redshift 
-
-# #711c91, #ea00d9, #0abdc6, #133e7c, #091833
-
-# A delineation line. 
-redshift_separator = canvas.create_rectangle(1100*sf, (toprow_y-320.0)*sf, 1940*sf, (toprow_y-310.0)*sf, outline="#0abdc6", fill="#0abdc6", tags="separator")
-
-
-# Make the EAZY redshift label
-if (EAZY_results_file_exists == True):
-	eazy_z_peak = getfile_value(current_id, eazy_results_IDs, eazy_results_zpeak, 4)
-	eazy_z_a = getfile_value(current_id, eazy_results_IDs, eazy_results_za, 4)
-	eazy_l68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zl68, 4)
-	eazy_u68 = getfile_value(current_id, eazy_results_IDs, eazy_results_zu68, 4)
-
-	eazy_label_zpeak = Label(root, text="z_EAZY, peak = "+str(eazy_z_peak)+" ("+str(eazy_l68)+" - "+str(eazy_u68)+")", font = "Helvetica "+str(textsizevalue), fg="#133e7c", bg="#ffffff")
-	eazy_label_zpeak.place(x=1100*sf, y = (toprow_y-290.0)*sf)
-	eazy_label_za = Label(root, text="z_EAZY, a = "+str(eazy_z_a), font = "Helvetica "+str(textsizevalue), fg="#133e7c", bg="#ffffff")
-	eazy_label_za.place(x=1100*sf, y = (toprow_y-250.0)*sf)
-
-
-# Make the BEAGLE redshift labels
-if (BEAGLE_results_file_exists == True):
-	beagle_z_avg = getfile_value(current_id, beagle_results_IDs, beagle_results_zavg, 4)
-	beagle_z_l68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zl68, 4)
-	beagle_z_u68 = getfile_value(current_id, beagle_results_IDs, beagle_results_zu68, 4)
+				f.write(str(fluxes_all[j,n])+' '+str(errors_all[j,n])+' ')
+		f.write(' \n')
+	f.close() 
 	
-	beagle_label = Label(root, text="z_BEAGLE,avg = "+str(beagle_z_avg)+" ("+str(beagle_z_l68)+" - "+str(beagle_z_u68)+")", font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
-	beagle_label.place(x=1100*sf, y = (toprow_y-210.0)*sf)
-	
-	beagle_z_1 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_1, 4)
-	beagle_z_1_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_1, 4)
-	beagle_z1_label = Label(root, text="z_BEAGLE,1 = "+str(beagle_z_1)+" +/- "+str(beagle_z_1_err), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
-	beagle_z1_label.place(x=1100*sf, y = (toprow_y-170.0)*sf)
-	
-	beagle_z_2 = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_2, 4)
-	beagle_z_2_err = getfile_value(current_id, beagle_results_IDs, beagle_results_redshift_err_2, 4)
-	beagle_z2_label = Label(root, text="z_BEAGLE,2 = "+str(beagle_z_2)+" +/- "+str(beagle_z_2_err), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
-	beagle_z2_label.place(x=1100*sf, y = (toprow_y-130.0)*sf)
+	# Write the EAZY translate file (but delete it first)
+	exists = os.path.isfile('zphot.translate')
+	if exists:
+		os.system('rm zphot.translate')
+		
+	EAZY_translate_file = 'zphot.translate'
+	f = open(EAZY_translate_file, 'w')
+	for n in range(0, number_filters):
+		f.write('f_'+filters[n]+' F'+str(filter_numbers[n])+' \n')
+		f.write('e_'+filters[n]+' E'+str(filter_numbers[n])+' \n')
+	f.write(' \n')
+	f.close() 
 
-	beagle_Pzgt2p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt2p0, 2)
-	beagle_Pzgt4p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt4p0, 2)
-	beagle_Pzgt6p0 = getfile_value(current_id, beagle_results_IDs, beagle_results_Pzgt6p0, 2)
-	beagle_prob_label = Label(root, text="P(z > 2) = "+str(beagle_Pzgt2p0)+", P(z > 4) = "+str(beagle_Pzgt4p0)+", P(z > 4) = "+str(beagle_Pzgt6p0), font = "Helvetica "+str(textsizevalue), fg="#711c91", bg="#ffffff")
-	beagle_prob_label.place(x=1100*sf, y = (toprow_y-90.0)*sf)
 
-#NN_z = 5.000
-if (NN_results_file_exists):
-	NN_zpred = getfile_value(current_id, NN_results_IDs, NN_results_zpred, 4)
-	NN_zspec = getfile_value(current_id, NN_results_IDs, NN_results_zspec, 4)
-	NN_use = getfile_true_or_false(current_id, NN_results_IDs, NN_results_use)
-	
-	if (NN_use == True):
-		nn_label = Label(root, text="z_NN = "+str(NN_zpred), font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
-	if (NN_use == False):
-		nn_label = Label(root, text="z_NN = "+str(NN_zpred)+" (USE = F)", font = "Helvetica "+str(textsizevalue), fg="grey", bg="#ffffff")
-	#nn_label.place(x=1800*sf, y = (toprow_y-210.0)*sf)
-	nn_label.place(x=1740*sf, y = (toprow_y-290.0)*sf)
-	if (use_zspec == True):
-		nn_label_zspec = Label(root, text="z_spec = "+str(NN_zspec), font = "Helvetica "+str(textsizevalue)+" bold", fg="red", bg="#ffffff")
-		nn_label_zspec.place(x=1740*sf, y = (toprow_y-250.0)*sf)
+	# Set up the parameters
+	params = {}
+	params['CATALOG_FILE'] = EAZY_output_filename
+	params['FILTERS_RES'] = ancillary_file_folder+'/FILTER.RES.latest'
+	params['FILTER_FORMAT'] = 1 
+	params['SMOOTH_FILTERS'] = False        # Smooth filter curves with Gaussian
+	params['SMOOTH_SIGMA'] = 100.         # Gaussian sigma (in Angstroms) to smooth filters
 
-if (color_selection_results_file_exists):
-	is_F090W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F090W_dropouts)
-	is_F115W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F115W_dropouts)
-	is_F150W_dropout = getfile_true_or_false(current_id, color_selection_IDs, color_selection_F150W_dropouts)
-	
-	if(is_F090W_dropout):
-		color_selection_label = Label(root, text="F090W Dropout", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
-		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
-	
-	elif(is_F115W_dropout):
-		color_selection_label = Label(root, text="F115W Dropout", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
-		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+	if (args_template_param):
+		params['TEMPLATES_FILE'] = args_template_param # Template definition file
 
-	elif(is_F150W_dropout):
-		color_selection_label = Label(root, text="F150W Dropout", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
-		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+	params['TEMPLATE_COMBOS'] = 'a'     # Template combination options: 
+                                        #         1 : one template at a time
+                                        #         2 : two templates, read allowed combinations from TEMPLATES_FILE
+                                        #        -2 : two templates, all permutations
+                                        # a <or> 99 : all templates simultaneously
+	params['NMF_TOLERANCE'] = 1.e-4              # Tolerance for non-negative combinations (TEMPLATE_COMBOS=a)
+	params['WAVELENGTH_FILE'] = ancillary_file_folder+'/templates/lambda.def' # Wavelength grid definition file
+	params['TEMP_ERR_FILE'] = ancillary_file_folder+'/templates/TEMPLATE_ERROR.v2.0.zfourge' # Template error definition file
+	params['TEMP_ERR_A2'] = 1.00                # Template error amplitude
+	params['SYS_ERR'] = 0.00                    # Systematic flux error (% of flux)
+	params['APPLY_IGM'] = True                  # Apply Madau 1995 IGM absorption
+	params['ADD_CGM'] = False                    # Add Asada24 CGM damping wing absorption
 
+	if (args_asada_cgm):
+		params['ADD_CGM'] = True                    # Add Asada24 CGM damping wing absorption
+#		params['SIGMOID_PARAM1'] = 3.4835           # Sigmoid func parameter (A) for the N_HI-z relation in Asada24
+#		params['SIGMOID_PARAM2'] = 1.2581           # Sigmoid func parameter (a) for the N_HI-z relation in Asada24
+#		params['SIGMOID_PARAM3'] = 18.249           # Sigmoid func parameter (C) for the N_HI-z relation in Asada24
+		params['SIGMOID_PARAM1'] = 3.5918           # Sigmoid func parameter (A) for the N_HI-z relation in Asada24 (updated, Feb 20)
+		params['SIGMOID_PARAM2'] = 1.8414           # Sigmoid func parameter (a) for the N_HI-z relation in Asada24 (updated, Feb 20)
+		params['SIGMOID_PARAM3'] = 18.001           # Sigmoid func parameter (C) for the N_HI-z relation in Asada24 (updated, Feb 20)
+
+	params['SCALE_2175_BUMP'] = 0.00            # Scaling of 2175A bump.  Values 0.13 (0.27) absorb ~10 (20) % at peak.
+	params['TEMPLATE_SMOOTH'] = 0.0             # Velocity smoothing (km/s) for templates, < 0 for no smoothing
+	params['RESAMPLE_WAVE'] = 'None'
+
+	## Input Files
+	params['CATALOG_FORMAT'] = 'ascii.commented_header' # Format if not FITS
+	params['MAGNITUDES'] = 'n'                  # Catalog photometry in magnitudes rather than f_nu fluxes
+	params['NOT_OBS_THRESHOLD'] = -90           # Ignore flux point if <NOT_OBS_THRESH
+	params['N_MIN_COLORS'] = 5                  # Require N_MIN_COLORS to fit
+	params['ARRAY_NBITS'] = 32                  # Bit depth of internally-created arrays
+
+	## Output Files
+	params['OUTPUT_DIRECTORY'] = 'OUTPUT'       # Directory to put output files in
+	params['MAIN_OUTPUT_FILE'] = 'photz'        # Main output file, .zout
+	params['PRINT_ERRORS'] = 'y'                # Print 68, 95 and 99% confidence intervals
+	params['CHI2_SCALE'] = 1.0                  # Scale ML Chi-squared values to improve confidence intervals
+	params['VERBOSE_LOG'] = True                # Dump information from the run into [MAIN_OUTPUT_FILE].param
+	params['OBS_SED_FILE'] = True               # Write out observed SED/object, .obs_sed
+	params['TEMP_SED_FILE'] = True              # Write out best template fit/object, .temp_sed
+	params['POFZ_FILE'] = True                  # Write out Pofz/object, .pz
+	params['BINARY_OUTPUT'] = True              # Save OBS_SED, TEMP_SED, PZ in binary format to read with e.g IDL
+
+	## Redshift / Mag prior
+	params['APPLY_PRIOR'] = False               # Apply apparent magnitude prior
+	params['PRIOR_FILE'] = ancillary_file_folder+'/templates/prior_F160W_TAO.dat' # File containing prior grid
+	params['PRIOR_FILTER'] = 448                 # Filter from FILTER_RES corresponding to the columns in PRIOR_FILE, originally 431
+	params['PRIOR_ABZP'] = 31.4                 # AB zeropoint of fluxes in catalog.  Needed for calculating apparent mags!
+	params['PRIOR_FLOOR'] = 1.e-2
+
+	## Redshift Grid
+	if (args.z_number_list):
+		params['FIX_ZSPEC'] = True                 # Fix redshift to catalog zspec	
 	else:
-		color_selection_label = Label(root, text=" ", font = "Helvetica "+str(textsizevalue), fg="#091833", bg="#ffffff")
-		color_selection_label.place(x=1760*sf, y = (toprow_y-90.0)*sf)
+		params['FIX_ZSPEC'] = False                 # Fix redshift to catalog zspec
+	params['Z_MIN'] = 0.00                      # Minimum redshift
+	params['Z_MAX'] = 22.0                      # Maximum redshift
+	params['Z_STEP'] = 0.1                     # Redshift step size
+	params['Z_STEP_TYPE'] = 0                   # 0 = ZSTEP, 1 = Z_STEP*(1+z)
 
-if (BAGPIPES_results_file_exists):
-	BAGPIPES_zpred = getfile_value(current_id-1, BAGPIPES_results_IDs, BAGPIPES_results_zphot, 4)
+	## Zeropoint Offsets
+	params['GET_ZP_OFFSETS'] = False                # Look for zphot.zeropoint file and compute zeropoint offsets
+	params['ZP_OFFSET_TOL'] = 1.e-4             # Tolerance for iterative fit for zeropoint offsets [not implemented]
 
-	bagpipes_label = Label(root, text="z_BAGPIPES = "+str(BAGPIPES_zpred), font = "Helvetica "+str(textsizevalue), fg="grey", bg="#ffffff")
-	bagpipes_label.place(x=1740*sf, y = (toprow_y-150.0)*sf)
+	## Rest-frame colors
+	params['REST_FILTERS'] = '---'              # Comma-separated list of rest frame filters to compute
+	params['RF_PADDING'] = 1000.                # Padding (Ang) for choosing observed filters around specified rest-frame pair.
+	params['RF_ERRORS'] = False                 # Compute RF color errors from p(z)
+	params['Z_COLUMN'] = 'z_a'                  # Redshift to use for rest-frame color calculation (z_a, z_p, z_m1, z_m2, z_peak)
+	params['USE_ZSPEC_FOR_REST'] = True         # Use z_spec when available for rest-frame colors
+	params['READ_ZBIN'] = False                 # Get redshifts from OUTPUT_DIRECTORY/MAIN_OUTPUT_FILE.zbin rather than fitting them.
 
+	## Cosmology
+	params['H0'] = 70.0               # Hubble constant (km/s/Mpc)
+	params['OMEGA_M'] = 0.3                # Omega_matter
+	params['OMEGA_L'] = 0.7                # Omega_lambda
 
-#SEDz_z = 5.000
-#Label(root, text="z_SEDz = ", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1100*sf, y = (toprow_y-210.0)*sf)
+	# Here's where we load in the tempfilt filename, if one exists and is specified. 
+	if (args_tempfilt_filename):
+		exists = os.path.isfile(args_tempfilt_filename)
+		if exists:
+			with open(args_tempfilt_filename, 'rb') as inp:
+				# Open up the tempfilt file, and compare it to the settings/parameters
+				tempfilt_file_data = pickle.load(inp)
+				if ((tempfilt_file_data['templates'] == args_template_param) and
+					(np.array_equal(tempfilt_file_data['filters'], filters)) and
+					(tempfilt_file_data['asada'] == args_asada_cgm) and
+					(tempfilt_file_data['Z_MIN'] == params['Z_MIN']) and 
+					(tempfilt_file_data['Z_MAX'] == params['Z_MAX']) and
+					(tempfilt_file_data['Z_STEP'] == params['Z_STEP']) and
+					(tempfilt_file_data['Z_STEP_TYPE'] == params['Z_STEP_TYPE'])
+					):
+					
+					tempfilt_array = tempfilt_file_data['tempfilt_array']
+					
+				else:
+					sys.exit("EXITING: The tempfilt file "+args_tempfilt_filename+" cannot be used in this EAZY configuration")
 
-#S3_z = 5.000
-#Label(root, text="z_S3 = ", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1100*sf, y = (toprow_y-170.0)*sf)
+	if (os.path.isfile(args_zeropoint_filename) == True):
+		print("Using zphot.zeropoint file!")
+		params['GET_ZP_OFFSETS'] = True                # Look for zphot.zeropoint file and compute zeropoint offsets
+		zeropoint_file = args_zeropoint_filename	
+		translate_file = 'zphot.translate' 
+		#param_file_name = 'zphot.param' 
+		if (args_tempfilt_filename):
+			exists = os.path.isfile(args_tempfilt_filename)
+			if exists:
+				eazy_self = eazy.photoz.PhotoZ(params = params, translate_file=translate_file, zeropoint_file=zeropoint_file, load_prior=False, load_products=False, tempfilt = tempfilt_array) 
+			else:
+				eazy_self = eazy.photoz.PhotoZ(params = params, translate_file=translate_file, zeropoint_file=zeropoint_file, load_prior=False, load_products=False) 
+		else:
+			eazy_self = eazy.photoz.PhotoZ(params = params, translate_file=translate_file, zeropoint_file=zeropoint_file, load_prior=False, load_products=False) 
+	
+	else:	
+		translate_file = 'zphot.translate' 
+		param_file_name = 'zphot.param' 
+		if (args_tempfilt_filename):
+			exists = os.path.isfile(args_tempfilt_filename)
+			if exists:
+				eazy_self = eazy.photoz.PhotoZ(params = params, translate_file=translate_file, zeropoint_file=None, load_prior=False, load_products=False, tempfilt = tempfilt_array) 
+			else:
+				eazy_self = eazy.photoz.PhotoZ(params = params, translate_file=translate_file, zeropoint_file=None, load_prior=False, load_products=False) 
+		else:
+			eazy_self = eazy.photoz.PhotoZ(params = params, translate_file=translate_file, zeropoint_file=None, load_prior=False, load_products=False) 
+	
+	if (args_tempfilt_filename):
+		exists = os.path.isfile(args_tempfilt_filename)
+		if exists:
+			print("tempfilt already exists, moving on.")
+		else:
+			# Let's package up important information.
+			tempfilt_file_data = {}
+			tempfilt_file_data['templates'] = args_template_param
+			tempfilt_file_data['filters'] = filters
+			tempfilt_file_data['asada'] = args_asada_cgm
+			tempfilt_file_data['Z_MIN'] = params['Z_MIN']
+			tempfilt_file_data['Z_MAX'] = params['Z_MAX']
+			tempfilt_file_data['Z_STEP'] = params['Z_STEP']
+			tempfilt_file_data['Z_STEP_TYPE'] = params['Z_STEP_TYPE']
+			tempfilt_file_data['tempfilt_array'] = eazy_self.tempfilt
+			with open(args_tempfilt_filename, 'wb') as f:
+				#pickle.dump(eazy_self.tempfilt, f)
+				pickle.dump(tempfilt_file_data, f)
+		
+	# Now, we actually fit the catalog, after generating the photometric offsets
+	eazy_self.fit_catalog(eazy_self.idx, n_proc=args_ezp)
+	
+	zout, hdu = eazy_self.standard_output(rf_pad_width=0.5, rf_max_err=2, prior=False, beta_prior=False, save_fits = False)
 
+	# This is the index for the source being shown in the GUI
+	object_iterator = 0
+	# And here's the ID of the first object in the list, the one that's shown. 
+	first_object = ID_numbers[object_iterator]
 
-# # # # # # # # # # # #
-# Flag Object Buttons
-
-# Create the Bad Fit Flag
-btn1 = Button(root, text = 'Bad Fit', bd = '5', command = badfit)
-btn1.config(height = int(2*sf), width = int(13*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn1.place(x = 600*sf, y = (toprow_y-20)*sf)
-
-# Create the High Redshift Flag Button
-btn1 = Button(root, text = 'High Redshift', bd = '5', command = highz)
-btn1.config(height = int(2*sf), width = int(11*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue), padx = 20, pady = 3)
-btn1.place(x = 793*sf, y = (toprow_y-20)*sf)
-
-# Create the Bad Data Flag
-btn1 = Button(root, text = 'Bad Data', bd = '5', command = baddata)
-btn1.config(height = int(2*sf), width = int(13*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn1.place(x = 1000*sf, y = (toprow_y-20)*sf)
-
-
-# # # # # # # # # # # #
-# Move to New Object Buttons
-
-
-# Create the Previous Object Button
-btn3 = Button(root, text = 'Previous Object', bd = '5', command = previousobject)  
-btn3.config(height = int(2*sf), width = int(20*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn3.place(x = 600*sf, y = bottomrow_y*sf)
-
-
-# Create the Next Object Button
-btn2 = Button(root, text = 'Next Object', bd = '5', command = nextobject)
-btn2.config(height = int(2*sf), width = int(20*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue), padx = 3, pady = 3)
-btn2.place(x = 917*sf, y = bottomrow_y*sf)
-
-if ((args.id_number_list is None) & (args.idarglist is None)):
-	# Create the Object Entry Field and Button
-	Label(root, text="Display Object: ", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=1220*sf, y = (bottomrow_y+10.0)*sf)
-	e1 = Entry(root, width = int(5*sf), font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff")
-	e1.place(x = 1370*sf, y = (bottomrow_y+6.0)*sf)
-
-	btn9 = Button(root, text = 'Go', bd = '5', command = gotoobject)  
-	btn9.config(height = int(1*sf), width = int(4*sf), fg='blue', highlightbackground='white', font=('helvetica', textsizevalue))
-	#btn2.pack(side = 'bottom')
-	btn9.place(x = 1470*sf, y = (bottomrow_y+9.0)*sf)
-
-
-# # # # # # # # # # # #
-# Quit Button
-
-btn4 = Button(root, text = 'Quit', bd = '5', command = save_destroy)  
-btn4.config(height = int(2*sf), width = int(10*sf), fg='red', highlightbackground='white', font=('helvetica', textsizevalue))
-btn4.place(x = 1850*sf, y = (bottomrow_y+10.0)*sf)
-
-# # # # # # # # # # # #
-# Save Canvas Button
-
-# save_canvas_imagegrab()
-btn4 = Button(root, text = 'Save Canvas', bd = '5', command = save_canvas)  
-btn4.config(height = int(2*sf), width = int(15*sf), fg='black', highlightbackground='white', font=('helvetica', textsizevalue))
-btn4.place(x = 1645*sf, y = (bottomrow_y+10.0)*sf)
-
-# # # # # # # # # # # # #
-# Fitsmap Link for Object
-
-if (fitsmap_link_exists == True):
-	link = Label(root, text="Fitsmap Link",font=('Helveticabold', 15), fg="blue", cursor="hand2")
-	link.pack()
-	final_fitsmap_link = get_fitsmap_link(fitsmap_link, current_id, ID_values, RA_values, DEC_values)
-	link.bind("<Button-1>", lambda e: callback(final_fitsmap_link))
-
-
-# # # # # # # # # # # #
-# Image Stretch Buttons
-
-Label(root, text="Stretch", font = ('helvetica', int(20*sf)), fg="#000000", bg='#ffffff').place(x=20*sf, y = (bottomrow_y+ 10.0)*sf)
-
-# Create the LinearStretch Button
-btn5 = Button(root, text = 'Linear', bd = '5', command = linearstretch)  
-if (defaultstretch == 'LinearStretch'):
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
-else:
-	btn5.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-btn5.place(x = 100*sf, y = (bottomrow_y+10.0)*sf)
-
-
-# Create the LogStretch Button
-btn6 = Button(root, text = 'Log', bd = '5', command = logstretch)  
-if (defaultstretch == 'LogStretch'):
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
-else:
-	btn6.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-btn6.place(x = 250*sf, y = (bottomrow_y+10.0)*sf)
-
-
-# Create the Asinh Button
-btn7 = Button(root, text = 'Asinh', bd = '5', command = asinhstretch)  
-if (defaultstretch == 'AsinhStretch'):
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='black', highlightbackground='white', font=('helvetica bold', textsizevalue))
-else:
-	btn7.config(height = int(2*sf), width = int(10*sf), fg='grey', highlightbackground='white', font=('helvetica', textsizevalue))
-btn7.place(x = 400*sf, y = (bottomrow_y+10.0)*sf)
-
-# # # # # # # # #  
-# Notes / RA/DEC
-
-# Create the Notes Field
-Label(root, text="Notes", font = "Helvetica 20", fg="#000000", bg="#ffffff").place(x=1220*sf, y = (toprow_y+5.0)*sf)
-e2 = Entry(root, width = int(50*sf), font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff")
-e2.place(x = 1300*sf, y = toprow_y*sf)
-e2.insert(0, notes_values[current_index])
-
-# Create the RA and DEC size field 
-Label(root, text="RA/DEC size", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=20*sf, y = (toprow_y+15.0)*sf)
-e3 = Entry(root, width = int(10*sf), font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff")
-e3.place(x = 150*sf, y = (toprow_y+10.0)*sf)
-e3.insert(0, str(ra_dec_size_value))
-Label(root, text="arcseconds", font=('helvetica', textsizevalue), fg="#000000", bg="#ffffff").place(x=280*sf, y = (toprow_y+15.0)*sf)
-btn8 = Button(root, text = 'Change', bd = '5', command = changeradecsize)  
-btn8.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-btn8.place(x = 400*sf, y = (toprow_y+13.0)*sf)
-
-btn12 = Button(root, text = 'Crosshair', bd = '5', command = togglecrosshair)  
-btn12.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-btn12.place(x = 400*sf, y = (toprow_y-25.0)*sf)
-
-
-# # # # # # # # #  
-# Alternate Fits 
-
-# The button to plot the BEAGLE results
-btn13 = Button(root, text = 'BEAGLE', bd = '5', command = plotbeagle)  
-btn13.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica bold', textsizevalue))
-btn13.place(x = 1300*sf, y = (toprow_y-50.0)*sf)
-
-# The button to plot the BAGPIPES results
-if (BAGPIPES_plots_exist == True):
-	btn10 = Button(root, text = 'BAGPIPES', bd = '5', command = plotbagpipes)  
-	btn10.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-	btn10.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
-
-# The button to plot the SEDz results
-#btn11 = Button(root, text = 'SEDz', bd = '5', command = plotsedz)  
-#btn11.config(height = 1, width = int(10*sf), fg='blue', highlightbackground = 'white', font=('helvetica', textsizevalue))
-#btn11.place(x = 1450*sf, y = (toprow_y-50.0)*sf)
-
-root.mainloop()
+	
+	# And finally, we instantiate the GUI. 
+	root = tk.Tk()
+	app = PlotGUI(root)
+	root.mainloop()
+	
+	
