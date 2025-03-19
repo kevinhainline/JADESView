@@ -1491,7 +1491,7 @@ if __name__ == '__main__':
 		params['FIX_ZSPEC'] = True                 # Fix redshift to catalog zspec	
 	else:
 		params['FIX_ZSPEC'] = False                 # Fix redshift to catalog zspec
-	params['Z_MIN'] = 0.00                      # Minimum redshift
+	params['Z_MIN'] = 0.01                      # Minimum redshift
 	params['Z_MAX'] = 22.0                      # Maximum redshift
 	params['Z_STEP'] = 0.01                     # Redshift step size
 	params['Z_STEP_TYPE'] = 0                   # 0 = ZSTEP, 1 = Z_STEP*(1+z)
