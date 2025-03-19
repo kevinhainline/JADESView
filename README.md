@@ -41,7 +41,7 @@ and also to specify some default parameters:
 input_photometry         /Path/to/photometric/catalog
 convolved                False
 aperture                 CIRC1
-uncertainty              _en
+uncertainty              _e
 filters                  JADES_filters_no_WFC3_v1.0.0.dat
 min_rel_err              0.05
 eazy_ncores              8
