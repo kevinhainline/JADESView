@@ -1568,7 +1568,7 @@ if __name__ == '__main__':
 		else:
 			# Let's package up important information.
 			tempfilt_file_data = {}
-			tempfilt_file_data['templates'] = args_template_param
+			tempfilt_file_data['templates'] = args_template_param.split('/')[-1]
 			tempfilt_file_data['filters'] = filters
 			tempfilt_file_data['asada'] = args_asada_cgm
 			tempfilt_file_data['Z_MIN'] = params['Z_MIN']
