@@ -175,6 +175,46 @@ save the whole GUI to a PNG, also labelled with the ID. Try it out!
 
 Finally, as you might expect, `Quit` quits the program. 
 
+## Example
+
+If you want to see the power of the code, you can download the "NIRCam Photometry (GOODS-S-Deep v2.0)"
+file from [the public JADES page](https://archive.stsci.edu/hlsp/jades). This file is named
+`hlsp_jades_jwst_nircam_goods-s-deep_photometry_v2.0_catalog.fits`, and you can point to
+this file and its location within `JADESView_input_file.dat`. Now, you can use the files
+`JADESView_files/JADES_filters_no_WFC3_v1.0.0.dat` for the filter selection, and 
+`JADESView_files/templates/JADES_fsps.dat`, which correspond to `JADES_GS_v100_tempfilt.pkl`,
+so your `JADESView_input_file.dat` would look like this:
+
+```
+input_photometry         hlsp_jades_jwst_nircam_goods-s-deep_photometry_v2.0_catalog.fits
+convolved                False
+aperture                 CIRC1
+uncertainty              _e
+filters                  JADES_filters_no_WFC3_v1.0.0.dat
+min_rel_err              0.05
+eazy_ncores              8
+ancillary_files          JADESView_files
+zeropoint                zphot.zeropoint
+templates                JADES_fsps.param
+tempfilt                 JADES_GS_v100_tempfilt.pkl 
+image_list               JADES_v100_mosaic_files.dat
+plot_thumbnails          False
+ra_dec_size_value        2.0
+asada_cgm                False
+fix_zspec                False
+fitsmap_link             https://jades.idies.jhu.edu/?ra=RA_VALUE&dec=DEC_VALUE&zoom=9
+```
+
+And now you can run:
+
+```
+% python -W ignore JADESView.py -jv_params ../JADESView_test/JADESView_input_file.dat -idarglist '128771, 130158, 183348'
+```
+
+To look at the SEDs. If you download the very large mosaic files on STScI JADES MAST site,
+you can point to those as indicated in `JADESView_files/JADES_v100_mosaic_files.dat` and
+those will be plotted beneath. 
+
 ## Installation
 
 While JADESView works under python3, you will need to use matplotlib v2.2.5. I recommend creating
