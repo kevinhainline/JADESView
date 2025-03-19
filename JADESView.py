@@ -1520,7 +1520,7 @@ if __name__ == '__main__':
 			with open(args_tempfilt_filename, 'rb') as inp:
 				# Open up the tempfilt file, and compare it to the settings/parameters
 				tempfilt_file_data = pickle.load(inp)
-				if ((tempfilt_file_data['templates'] == args_template_param) and
+				if ((tempfilt_file_data['templates'].split('/')[-1] == args_template_param.split('/')[-1]) and
 					(np.array_equal(tempfilt_file_data['filters'], filters)) and
 					(tempfilt_file_data['asada'] == args_asada_cgm) and
 					(tempfilt_file_data['Z_MIN'] == params['Z_MIN']) and 
