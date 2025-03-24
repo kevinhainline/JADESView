@@ -630,9 +630,9 @@ class PlotGUI:
 		self.ax[1].set_xlabel(r'z$_{phot}$')
 		self.ax[1].set_ylabel(r'$\chi^2$')
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 19)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
 			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
 	
 		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
@@ -718,9 +718,9 @@ class PlotGUI:
 		self.ax[1].set_ylabel(r'$\chi^2$')
 
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 19)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
 			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
 		
 		self.ax[1].axvspan(z500-0.01, z500+0.01, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
@@ -802,9 +802,9 @@ class PlotGUI:
 		self.ax[1].set_ylabel(r'$\chi^2$')
 
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(bf_chisq_value), zorder = 19)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
 			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
 
 		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
