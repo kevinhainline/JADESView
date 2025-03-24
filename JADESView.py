@@ -185,6 +185,7 @@ def return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.
 	# Let's get the data from the eazy-py file 
 	tempfilt_zgrid = eazy_self.zgrid
 	chi2fit = eazy_self.chi2_fit[i,:]
+	lnp = eazy_self.lnp[i,:]
 
 	output_chisq = eazy_self.chi2_fit[i,:]
 	
@@ -206,7 +207,7 @@ def return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.
 	output_phot_err = data['efobs']*1e3
 	output_tef = data['tef']
 
-	return output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, output_redshift, tempfilt_zgrid, chi2fit
+	return output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, output_redshift, tempfilt_zgrid, chi2fit, lnp
 
 def return_version_string(input_file_name):
 	if (input_file_name.split('/')[-1].startswith('hlsp')):
@@ -478,23 +479,23 @@ class PlotGUI:
 
 		# This is the best fit values from EAZY, which we'll always want to keep
 		# on the plot.
-		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit, bf_lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 
 		# This determines whether or not there is an alternate redshift specified
 		# by the user. 
 		if (self.altz_entry.get() == ''):
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 		else:
 
 			# Make sure that the alternate redshift is between the minimum and maximum values.
 			# Otherwise, reset to the best-fit redshift.
 			if ((float(self.altz_entry.get()) > eazy_self.param['Z_MIN']) and (float(self.altz_entry.get()) < eazy_self.param['Z_MAX'])):
-				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
 			else:
 				self.altz_entry.delete(0, tk.END)
 				self.altz_entry.insert(0,"") 
 				print("NOTE: Alternate redshift must be between "+str(eazy_self.param['Z_MIN'])+" and "+str(eazy_self.param['Z_MAX']))
-				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 
 		# Let's plot the SED:
 		pos_flux_errors = np.where(output_phot_err > 0)[0]
@@ -606,13 +607,14 @@ class PlotGUI:
 		# Now, let's plot the chi-square surface. 
 		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
 
-		# Let's grab the chisq value at the specified redshift. 
-		bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
-		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
-
 		# Got to get the index within the EAZY object
 		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
-		
+
+		# Let's grab the chisq value at the specified redshift. 
+		#bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		bf_chisq_value = zout['raw_chi2'][objid_index]
+		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
+				
 		# Here are the output redshift values from the EAZY fit
 		z160 = zout['z160'][objid_index]
 		z840 = zout['z840'][objid_index]
@@ -667,29 +669,32 @@ class PlotGUI:
 		
 		object_ID = int(self.id_entry.get())
 
-		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit, bf_lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 		
 		if (self.altz_entry.get() == ''):
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 		else:
 			if ((float(self.altz_entry.get()) > eazy_self.param['Z_MIN']) and (float(self.altz_entry.get()) < eazy_self.param['Z_MAX'])):
-				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
 			else:
 				self.altz_entry.delete(0, tk.END)
 				self.altz_entry.insert(0,"") 
 				print("NOTE: Alternate redshift must be between "+str(eazy_self.param['Z_MIN'])+" and "+str(eazy_self.param['Z_MAX']))
-				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 
 		p_of_z = np.exp((-1.0) * (chi2fit - np.min(chi2fit))/2.0)
 		
 		# Now, let's plot the chi-square surface. 
 		self.ax[1].plot(tempfilt_zgrid, p_of_z, color = chisq_surface_color, zorder = 40)
-		
+
+		# Got to get the index within the EAZY object
+		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
+
 		# Let's grab the chisq value at the specified redshift. 
-		bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		#bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		bf_chisq_value = zout['raw_chi2'][objid_index]
 		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
 
-		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
 		z160 = zout['z160'][objid_index]
 		z840 = zout['z840'][objid_index]
 		
@@ -700,6 +705,14 @@ class PlotGUI:
 
 		z025 = zout['z025'][objid_index]
 		z975 = zout['z975'][objid_index]
+
+		# The "maximum likelihood" redshift from EAZY, derived from fitting a parabola to the lnp surface
+		# see "get_maxlnp_redshift" within EAZY.
+		#zml = zout['z_ml'][objid_index]
+		#zml_chisq = zout['z_ml_chi2'][objid_index]
+		
+		# The raw chisq minimum. 
+		bf_chisq_value = zout['raw_chi2'][objid_index]
 		
 		self.ax[1].set_xlabel(r'z$_{phot}$')
 		self.ax[1].set_ylabel(r'$\chi^2$')
@@ -711,6 +724,7 @@ class PlotGUI:
 			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
 		
 		self.ax[1].axvspan(z500-0.01, z500+0.01, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
+		#self.ax[1].axvspan(zml-0.01, zml+0.01, color = 'cyan', label = 'zml = '+str(round(zml,2))+', $\chi^2 = $'+str(zml_chisq), alpha = 0.2, zorder = 3)
 
 		self.ax[1].set_xlim(z160-2,z840+2)
 		self.ax[1].axvspan(z025, z975, color = 'grey', zorder = 0, alpha = 0.2)
@@ -732,12 +746,12 @@ class PlotGUI:
 
 		object_ID = int(self.id_entry.get())
 
-		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit, bf_lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 		
 		if (self.altz_entry.get() == ''):
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 		else:
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp= return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
 
 		self.ax[0].set_xlim(0, 5.5)
 		self.xmin_entry.delete(0, tk.END)  # Delete current text
@@ -762,13 +776,14 @@ class PlotGUI:
 		# Now, let's plot the chi-square surface. 
 		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
 
-		# Let's grab the chisq value at the specified redshift. 
-		bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
-		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
-
 		# Got to get the index within the EAZY object
 		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
 		
+		# Let's grab the chisq value at the specified redshift. 
+		#bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		bf_chisq_value = zout['raw_chi2'][objid_index]
+		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
+
 		# Here are the output redshift values from the EAZY fit
 		z160 = zout['z160'][objid_index]
 		z840 = zout['z840'][objid_index]
@@ -831,9 +846,9 @@ class PlotGUI:
 		version_string = return_version_string(args_input_file)
 
 		if (self.altz_entry.get() == ''):
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 		else:
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
 
 		# Got to update the base final image name with convolved or unconvolved
 		output_filename = self.id_entry.get()+"_"+version_string+"_"+str(args_aperture)
@@ -857,9 +872,9 @@ class PlotGUI:
 
 		# Need to get the z_a_value to set the base final image name
 		if (self.altz_entry.get() == ''):
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(int(self.id_entry.get()), eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(int(self.id_entry.get()), eazy_self, zout, primary_z = -9999, alt_z = 0.0)
 		else:
-			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit = return_eazy_output(int(self.id_entry.get()), eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(int(self.id_entry.get()), eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
 		
 		# Got to update the base final image name with convolved or unconvolved
 		output_filename = self.id_entry.get()+"_"+version_string+"_"+str(args_aperture)
