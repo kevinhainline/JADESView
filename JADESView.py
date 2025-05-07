@@ -231,10 +231,25 @@ class PlotGUI:
 	def __init__(self, root):
 		self.root = root
 		self.root.title("JADESView v2")
+		#self.root.bind("<Configure>", self.on_resize)
   		
 		self.current_ID = -9999
 		self.current_thumbnail_size = -9999
-        
+
+		screen_width = self.root.winfo_screenwidth()
+		screen_height = self.root.winfo_screenheight()        
+
+		dpi = 100  # Approximate dots per inch
+		fig_width = screen_width / dpi * 0.6  # 60% of screen width
+		fig_height = screen_height / dpi * 0.35  # 40% of screen height
+		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+
+		base_fontsize = fig_width * 0.8  # Adjust scaling factor
+		small_label_fontsize = fig_width * 0.5
+		label_fontsize = fig_width * 0.6
+		title_fontsize = fig_width * 1.0
+		plt.rcParams.update({'font.size': base_fontsize})
+		
 		# Main container frame
 		main_frame = tk.Frame(root)
 		main_frame.pack(fill=tk.BOTH, expand=True)
@@ -244,7 +259,7 @@ class PlotGUI:
 		plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         
 		# Create figure and axis for plot
-		self.fig, self.ax = plt.subplots(1,2, figsize=(14, 5))
+		self.fig, self.ax = plt.subplots(1,2, figsize=(fig_width, fig_height))
 		self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
 		self.canvas_widget = self.canvas.get_tk_widget()
 		self.canvas_widget.pack(fill=tk.BOTH, expand=True)
@@ -272,7 +287,7 @@ class PlotGUI:
 				n_columns = 10
 				total_possible = 30
 			# This creates the plot that will be appended below the SED.
-			self.image_fig, self.image_axes = plt.subplots(n_image_rows, n_columns, figsize=(14, 4))
+			self.image_fig, self.image_axes = plt.subplots(n_image_rows, n_columns, figsize=(fig_width, thumbnail_fig_height))
 	
 			self.image_fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
 			self.image_fig.subplots_adjust(wspace = 0.05, hspace = 0.01)
@@ -412,6 +427,20 @@ class PlotGUI:
 
 		self.ax[0].clear()
 		self.ax[1].clear()
+
+		screen_width = self.root.winfo_screenwidth()
+		screen_height = self.root.winfo_screenheight()        
+
+		dpi = 100  # Approximate dots per inch
+		fig_width = screen_width / dpi * 0.6  # 60% of screen width
+		fig_height = screen_height / dpi * 0.35  # 40% of screen height
+		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+
+		base_fontsize = fig_width * 0.8  # Adjust scaling factor
+		small_label_fontsize = fig_width * 0.7
+		label_fontsize = fig_width * 0.9
+		title_fontsize = fig_width * 1.0
+
 		
 		# Get the ID entry.
 		if (self.id_entry.get() == ''):
@@ -518,10 +547,10 @@ class PlotGUI:
 		
 		# Make sure that we specify that the SED fit is from EAZY-py.
 		if (args_asada_cgm == True):
-			self.ax[0].text(0.8, 0.06, 'EAZY-py fit, Asada+24 CGM', fontsize = 12, horizontalalignment='center',
+			self.ax[0].text(0.8, 0.06, 'EAZY-py fit, Asada+24 CGM', fontsize = label_fontsize, horizontalalignment='center',
 				verticalalignment='center', transform=self.ax[0].transAxes)
 		else:
-			self.ax[0].text(0.85, 0.06, 'EAZY-py fit', fontsize = 12, horizontalalignment='center',
+			self.ax[0].text(0.85, 0.06, 'EAZY-py fit', fontsize = label_fontsize, horizontalalignment='center',
 				verticalalignment='center', transform=self.ax[0].transAxes)
 					
 		# And now let's figure out the X and Y limits for the plot. 
@@ -550,10 +579,10 @@ class PlotGUI:
 		self.ax[0].set_ylim(ymin, ymax)
 
 		# Here's the title for the plot
-		self.ax[0].set_title(JADES_ID+' --- ID '+str(int(object_ID)), fontsize = 15)
+		self.ax[0].set_title(JADES_ID+' --- ID '+str(int(object_ID)), fontsize = title_fontsize)
 	
 		# And let's set the legend. 
-		self.ax[0].legend(loc = 2, fontsize = 12, frameon=False)
+		self.ax[0].legend(loc = 2, fontsize = label_fontsize, frameon=False)
 
 		# First, make sure the user specifies that they want thumbnails
 		if (args_plot_thumbnails):
@@ -586,15 +615,15 @@ class PlotGUI:
 						else:
 							ax.imshow(img, cmap='gray', origin = 'lower', aspect = 'equal')
 		
-						ax.text(0.51, 0.96, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'black')
-						ax.text(0.5, 0.95, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=12, fontweight='bold', ha='center', va='top', color = 'white')
+						ax.text(0.51, 0.96, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', ha='center', va='top', color = 'black')
+						ax.text(0.5, 0.95, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', ha='center', va='top', color = 'white')
 		
 						if ((round(SNR_values[object_ID_index,j],2) > -100) and (round(SNR_values[object_ID_index,j],2) < 100)):
-							ax.text(0.5, 0.06, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=12, fontweight='bold', horizontalalignment='center', color = 'black')
-							ax.text(0.5, 0.05, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=12, fontweight='bold', horizontalalignment='center', color = 'white')
+							ax.text(0.5, 0.06, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', horizontalalignment='center', color = 'black')
+							ax.text(0.5, 0.05, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', horizontalalignment='center', color = 'white')
 						elif(round(SNR_values[object_ID_index,j],2) > 100):
-							ax.text(0.5, 0.06, 'SNR > 100', transform=ax.transAxes, fontsize=10, fontweight='bold', horizontalalignment='center', color = 'black')
-							ax.text(0.5, 0.05, 'SNR > 100', transform=ax.transAxes, fontsize=10, fontweight='bold', horizontalalignment='center', color = 'white')
+							ax.text(0.5, 0.06, 'SNR > 100', transform=ax.transAxes, fontsize=small_label_fontsize, fontweight='bold', horizontalalignment='center', color = 'black')
+							ax.text(0.5, 0.05, 'SNR > 100', transform=ax.transAxes, fontsize=small_label_fontsize, fontweight='bold', horizontalalignment='center', color = 'white')
 		
 						ax.axis('off')
 					self.image_canvas.draw()
@@ -643,14 +672,17 @@ class PlotGUI:
 		version_string = return_version_string(args_input_file)
 
 		if (default_convolved == True):
-			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Convolved', fontsize = 15)
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Convolved', fontsize = title_fontsize)
 		else: 
-			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Not Convolved', fontsize = 15)
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Not Convolved', fontsize = title_fontsize)
 
 		
-		chisq_legend = self.ax[1].legend(loc = 2, fontsize = 12, frameon=False)
+		chisq_legend = self.ax[1].legend(loc = 2, fontsize = label_fontsize, frameon=False)
 		chisq_legend.set_zorder(50)
-		self.ax[1].set_ylim(-10, np.max(chi2fit)+0.1 * np.max(chi2fit))
+		if (math.isnan(np.max(chi2fit)) or  math.isinf(np.max(chi2fit))):
+			self.ax[1].set_ylim(-10, 100)
+		else:
+			self.ax[1].set_ylim(-10, np.max(chi2fit)+0.1 * np.max(chi2fit))
 		if (self.chisq_ymax_entry.get() != ''):
 			self.ax[1].set_ylim(-10, float(self.chisq_ymax_entry.get()))
 
@@ -666,6 +698,20 @@ class PlotGUI:
 		chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
 		zspec_color = '#332288'#'orange'
 		alternate_color = 'grey'
+
+		screen_width = self.root.winfo_screenwidth()
+		screen_height = self.root.winfo_screenheight()        
+
+		dpi = 100  # Approximate dots per inch
+		fig_width = screen_width / dpi * 0.6  # 60% of screen width
+		fig_height = screen_height / dpi * 0.35  # 40% of screen height
+		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+
+		base_fontsize = fig_width * 0.8  # Adjust scaling factor
+		small_label_fontsize = fig_width * 0.7
+		label_fontsize = fig_width * 0.9
+		title_fontsize = fig_width * 1.0
+
 		
 		object_ID = int(self.id_entry.get())
 
@@ -730,7 +776,7 @@ class PlotGUI:
 		self.ax[1].axvspan(z025, z975, color = 'grey', zorder = 0, alpha = 0.2)
 		self.ax[1].axvspan(z160, z840, color = 'grey', zorder = 1, alpha = 0.5)
 
-		pz_legend = self.ax[1].legend(loc = 4, fontsize = 12, frameon=False)
+		pz_legend = self.ax[1].legend(loc = 4, fontsize = label_fontsize, frameon=False)
 		pz_legend.set_zorder(50)
 
 		if (self.chisq_ymax_entry.get() != ''):
@@ -743,6 +789,19 @@ class PlotGUI:
   	      
     # This will reset the SED plot axes. 
 	def reset_plot(self):
+
+		screen_width = self.root.winfo_screenwidth()
+		screen_height = self.root.winfo_screenheight()        
+
+		dpi = 100  # Approximate dots per inch
+		fig_width = screen_width / dpi * 0.6  # 60% of screen width
+		fig_height = screen_height / dpi * 0.35 # 40% of screen height
+		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+
+		base_fontsize = fig_width * 0.8  # Adjust scaling factor
+		small_label_fontsize = fig_width * 0.7
+		label_fontsize = fig_width * 0.9
+		title_fontsize = fig_width * 1.0
 
 		object_ID = int(self.id_entry.get())
 
@@ -815,12 +874,12 @@ class PlotGUI:
 		version_string = return_version_string(args_input_file)
 
 		if (default_convolved == True):
-			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Convolved', fontsize = 15)
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Convolved', fontsize = title_fontsize)
 		else: 
-			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Not Convolved', fontsize = 15)
+			self.ax[1].set_title('Photometry: '+version_string+', '+str(args_aperture)+', Not Convolved', fontsize = title_fontsize)
 
 		
-		chisq_legend = self.ax[1].legend(loc = 2, fontsize = 12, frameon=False)
+		chisq_legend = self.ax[1].legend(loc = 2, fontsize = label_fontsize, frameon=False)
 		chisq_legend.set_zorder(50)
 
 		if (self.chisq_ymax_entry.get() != ''):
@@ -1007,6 +1066,36 @@ class PlotGUI:
 				clicked_x = event.xdata 
 				# Pass to click handler function
 				self.handle_x_click(clicked_x)  
+
+
+# 	def on_resize(self, event):
+# 		""" Adjusts figure size dynamically when the window resizes. """
+# 		new_width = self.root.winfo_width()
+# 		new_height = self.root.winfo_height()
+# 		
+# 		dpi = 100  # Keep DPI fixed
+# 		fig_width = new_width / dpi * 0.6  # Scale based on new width
+# 		fig_height = new_height / dpi * 0.4  # Scale based on new height
+# 		thumbnail_fig_height = new_height / dpi * 0.2  # 40% of screen height
+# 		
+# 		# Update figure size
+# 		self.fig.set_size_inches(fig_width, fig_height, forward=True)
+# 		
+# 		# Adjust font sizes dynamically
+# 		base_fontsize = fig_width * 1.2
+# 		base_fontsize = fig_width * 0.8  # Adjust scaling factor
+# 		small_label_fontsize = fig_width * 0.5
+# 		label_fontsize = fig_width * 0.6
+# 		title_fontsize = fig_width * 1.0
+# 		plt.rcParams.update({'font.size': base_fontsize})
+# 
+# 		if (args_plot_thumbnails):
+# 			self.image_fig.set_size_inches(fig_width, thumbnail_fig_height)
+# 		
+# 		# Redraw the canvas
+# 		self.canvas.draw()
+
+
 
 	def handle_x_click(self, x_value):
 		# Example action: update a label or print
@@ -1368,8 +1457,12 @@ if __name__ == '__main__':
 
 		subsample_id_index = np.zeros(number_input_objects, dtype = 'int')
 		for j in range(0, number_input_objects):
-			subsample_id_index[j] = np.where(ID_values == ID_numbers[j])[0][0]
-		
+			test_subsample_id_index = np.where(ID_values == ID_numbers[j])[0]
+			if (len(test_subsample_id_index) > 0):
+				subsample_id_index[j] = test_subsample_id_index[0]
+			else:
+				sys.exit("Exiting: ID "+str(ID_numbers[j])+" not found!")
+				
 		#ID_values = ID_values[subsample_id_index]
 		redshifts = redshifts[subsample_id_index]
 		fluxes_all = fluxes_all[subsample_id_index,:]
