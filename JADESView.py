@@ -239,10 +239,19 @@ class PlotGUI:
 		screen_width = self.root.winfo_screenwidth()
 		screen_height = self.root.winfo_screenheight()        
 
-		dpi = 100  # Approximate dots per inch
-		fig_width = screen_width / dpi * 0.6  # 60% of screen width
-		fig_height = screen_height / dpi * 0.35  # 40% of screen height
-		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+		if (args_gui_width):
+			fig_width = args_gui_width
+			fig_height = args_gui_width / 3.55
+			thumbnail_fig_height = fig_height * 0.8
+		else:
+			dpi = 100  # Approximate dots per inch
+			fig_width = screen_width / dpi * 0.5  
+			fig_height = screen_height / dpi * 0.25  
+			thumbnail_fig_height = screen_height / dpi * 0.2  
+	
+			print(" Screen Width: "+str(screen_width)+", Screen Height: "+str(screen_height))
+		print(" Fig Width: "+str(fig_width)+", Fig Height: "+str(fig_height))
+		print(" Thumbnail Fig Height: "+str(thumbnail_fig_height))
 
 		base_fontsize = fig_width * 0.8  # Adjust scaling factor
 		small_label_fontsize = fig_width * 0.5
@@ -431,16 +440,24 @@ class PlotGUI:
 		screen_width = self.root.winfo_screenwidth()
 		screen_height = self.root.winfo_screenheight()        
 
-		dpi = 100  # Approximate dots per inch
-		fig_width = screen_width / dpi * 0.6  # 60% of screen width
-		fig_height = screen_height / dpi * 0.35  # 40% of screen height
-		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+		if (args_gui_width):
+			fig_width = args_gui_width
+			fig_height = args_gui_width / 3.55
+			thumbnail_fig_height = fig_height * 0.8
+		else:
+			dpi = 100  # Approximate dots per inch
+			fig_width = screen_width / dpi * 0.5  
+			fig_height = screen_height / dpi * 0.25  
+			thumbnail_fig_height = screen_height / dpi * 0.2  
 
 		base_fontsize = fig_width * 0.8  # Adjust scaling factor
 		small_label_fontsize = fig_width * 0.7
 		label_fontsize = fig_width * 0.9
 		title_fontsize = fig_width * 1.0
 
+		observed_point_size = fig_width * 4.
+		model_square_size = fig_width * 7.
+		line_thickness = fig_width / 5.
 		
 		# Get the ID entry.
 		if (self.id_entry.get() == ''):
@@ -529,14 +546,14 @@ class PlotGUI:
 		# Let's plot the SED:
 		pos_flux_errors = np.where(output_phot_err > 0)[0]
 		if (self.altz_entry.get() == ''):
-			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = 2, zorder = 0, label = '$z_a$ = '+str(round(z_a_value,2)))
+			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = '$z_a$ = '+str(round(z_a_value,2)))
 		else:
-			self.ax[0].plot(bf_output_wavelength/1e4, bf_output_flux, color = 'grey', lw = 2, zorder = 0, label = '$z_a$ = '+str(round(bf_z_a_value,2)), alpha = 0.5)
-			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = 2, zorder = 0, label = '$z_{\mathrm{alt}}$ = '+str(round(z_a_value,2)))
-		self.ax[0].scatter(output_phot_wavelength/1e4, output_phot_template, marker = 's', s = 110, edgecolor = template_color, color = 'None', zorder = 5)
+			self.ax[0].plot(bf_output_wavelength/1e4, bf_output_flux, color = 'grey', lw = line_thickness, zorder = 0, label = '$z_a$ = '+str(round(bf_z_a_value,2)), alpha = 0.5)
+			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = '$z_{\mathrm{alt}}$ = '+str(round(z_a_value,2)))
+		self.ax[0].scatter(output_phot_wavelength/1e4, output_phot_template, marker = 's', s = model_square_size, edgecolor = template_color, color = 'None', zorder = 5)
 		
 		# And now let's plot the photometry, along with the flux uncertainties, and the filter widths. 
-		self.ax[0].scatter(output_phot_wavelength[pos_flux_errors]/1e4, output_phot[pos_flux_errors], color = color_filters[pos_flux_errors], s = 50, zorder = 10)
+		self.ax[0].scatter(output_phot_wavelength[pos_flux_errors]/1e4, output_phot[pos_flux_errors], color = color_filters[pos_flux_errors], s = observed_point_size, zorder = 10)
 		self.ax[0].errorbar(output_phot_wavelength[pos_flux_errors]/1e4, output_phot[pos_flux_errors],  xerr = filter_bw[pos_flux_errors]/2.0, yerr = output_phot_err[pos_flux_errors], color = 'black', ls = 'None', alpha = 0.4)
 
 		# Currently, let's look at flux on a logarithmic axis, in the future I'll make
@@ -634,7 +651,7 @@ class PlotGUI:
 			self.current_thumbnail_size = current_thumbnail_size
 		
 		# Now, let's plot the chi-square surface. 
-		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
+		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, lw = line_thickness, zorder = 40)
 
 		# Got to get the index within the EAZY object
 		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
@@ -702,10 +719,15 @@ class PlotGUI:
 		screen_width = self.root.winfo_screenwidth()
 		screen_height = self.root.winfo_screenheight()        
 
-		dpi = 100  # Approximate dots per inch
-		fig_width = screen_width / dpi * 0.6  # 60% of screen width
-		fig_height = screen_height / dpi * 0.35  # 40% of screen height
-		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+		if (args_gui_width):
+			fig_width = args_gui_width
+			fig_height = args_gui_width / 3.55
+			thumbnail_fig_height = fig_height * 0.8
+		else:
+			dpi = 100  # Approximate dots per inch
+			fig_width = screen_width / dpi * 0.5  
+			fig_height = screen_height / dpi * 0.25  
+			thumbnail_fig_height = screen_height / dpi * 0.2  
 
 		base_fontsize = fig_width * 0.8  # Adjust scaling factor
 		small_label_fontsize = fig_width * 0.7
@@ -793,10 +815,15 @@ class PlotGUI:
 		screen_width = self.root.winfo_screenwidth()
 		screen_height = self.root.winfo_screenheight()        
 
-		dpi = 100  # Approximate dots per inch
-		fig_width = screen_width / dpi * 0.6  # 60% of screen width
-		fig_height = screen_height / dpi * 0.35 # 40% of screen height
-		thumbnail_fig_height = screen_height / dpi * 0.25  # 40% of screen height
+		if (args_gui_width):
+			fig_width = args_gui_width
+			fig_height = args_gui_width / 3.55
+			thumbnail_fig_height = fig_height * 0.8
+		else:
+			dpi = 100  # Approximate dots per inch
+			fig_width = screen_width / dpi * 0.5  
+			fig_height = screen_height / dpi * 0.25  
+			thumbnail_fig_height = screen_height / dpi * 0.2  
 
 		base_fontsize = fig_width * 0.8  # Adjust scaling factor
 		small_label_fontsize = fig_width * 0.7
@@ -1238,6 +1265,13 @@ if __name__ == '__main__':
 		# the size of the thumbnails, in arcseconds
 		if (input_lines[i,0] == 'ra_dec_size_value'):
 			ra_dec_size_value = float(input_lines[i,1])
+
+		# the width of the GUI, for smaller monitors
+		if (input_lines[i,0] == 'gui_width'):
+			if (float(input_lines[i,1]) > 0):
+				args_gui_width = float(input_lines[i,1])
+			else: 
+				args_gui_width = False
 
 		# the raw fitsmap link
 		if (input_lines[i,0] == 'fitsmap_link'):
