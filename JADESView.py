@@ -1267,11 +1267,10 @@ if __name__ == '__main__':
 			ra_dec_size_value = float(input_lines[i,1])
 
 		# the width of the GUI, for smaller monitors
+		args_gui_width = False
 		if (input_lines[i,0] == 'gui_width'):
 			if (float(input_lines[i,1]) > 0):
 				args_gui_width = float(input_lines[i,1])
-			else: 
-				args_gui_width = False
 
 		# the raw fitsmap link
 		if (input_lines[i,0] == 'fitsmap_link'):
