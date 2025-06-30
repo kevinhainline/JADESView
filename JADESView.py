@@ -226,6 +226,29 @@ def return_version_string(input_file_name):
 
 	return version_string
 
+def save_all_eazy_sed(object_ID):
+
+	# Get the photometry version
+	version_string = return_version_string(args_input_file)
+
+	output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+
+	# Got to update the base final image name with convolved or unconvolved
+	output_filename = str(object_ID)+"_"+version_string+"_"+str(args_aperture)
+	if (default_convolved == True):
+		output_filename = output_filename+"_conv"
+	else: 
+		output_filename = output_filename+"_unconv"
+
+	output_SED_file = output_filename + "_z_"+str(z_a_value) + '_SED_microns_nJy.txt'
+	np.savetxt(output_SED_file, np.c_[output_wavelength/1e4, output_flux], fmt = '%f %f', header="Wavelength (microns) Flux (nJy)")	
+	print("Saving EAZY SED as "+output_SED_file)
+
+	output_chisq_file = output_filename + '_z_chisq.txt'
+	np.savetxt(output_chisq_file, np.c_[tempfilt_zgrid, chi2fit], fmt = '%f %f', header="Redshift chisq")	
+	print("Saving EAZY chisq as "+output_chisq_file)
+
+
 # Here's the Plot GUI information
 class PlotGUI:
 	def __init__(self, root):
@@ -951,7 +974,6 @@ class PlotGUI:
 		np.savetxt(output_chisq_file, np.c_[tempfilt_zgrid, chi2fit], fmt = '%f %f', header="Redshift chisq")	
 		print("Saving EAZY chisq as "+output_chisq_file)
 
-
 	def save_gui(self):
 		# Get the photometry version
 		version_string = return_version_string(args_input_file)
@@ -1197,6 +1219,7 @@ if __name__ == '__main__':
 	# Read in the various input values from the input file. 
 	input_lines = np.loadtxt(args.JADESView_input_file, dtype='str')
 	number_input_lines = len(input_lines[:,0])
+	generate_seds = False
 	for i in range(0, number_input_lines):
 
 		# ANCILLARY FILE FOLDER
@@ -1276,6 +1299,14 @@ if __name__ == '__main__':
 		if (input_lines[i,0] == 'fitsmap_link'):
 			fitsmap_link = input_lines[i,1]
 			fitsmap_link_exists = True
+
+		# only generate the EAZY output SED plots at the z_a values.
+		if (input_lines[i,0] == 'generate_seds'):
+			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
+				generate_seds = True
+			else:
+				generate_seds = False
+			
 
 	# CHECKING IF THE FILES EXIST
 	# Checking whether the ancillary file folder exists
@@ -1731,10 +1762,15 @@ if __name__ == '__main__':
 	# And here's the ID of the first object in the list, the one that's shown. 
 	first_object = ID_numbers[object_iterator]
 
-	
-	# And finally, we instantiate the GUI. 
-	root = tk.Tk()
-	app = PlotGUI(root)
-	root.mainloop()
+	# make all of the SEDs for the sources
+	if (generate_seds == True):
+		for p in range(0, number_input_objects):
+			save_all_eazy_sed(ID_numbers[p])
+	# or else run the GUI
+	else:
+		# Instantiate the GUI. 
+		root = tk.Tk()
+		app = PlotGUI(root)
+		root.mainloop()
 	
 	
