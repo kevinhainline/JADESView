@@ -699,10 +699,10 @@ class PlotGUI:
 		self.ax[1].set_xlabel(r'z$_{phot}$')
 		self.ax[1].set_ylabel(r'$\chi^2$')
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
-			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = r'z$_{\mathrm{alt}}$ = '+str(z_a_value)+r', $\chi^2 = $'+str(chisq_value), zorder = 20)
 	
 		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
 
@@ -809,10 +809,10 @@ class PlotGUI:
 		self.ax[1].set_ylabel(r'$\chi^2$')
 
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
-			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = r'z$_{\mathrm{alt}}$ = '+str(z_a_value)+r', $\chi^2 = $'+str(chisq_value), zorder = 20)
 		
 		self.ax[1].axvspan(z500-0.01, z500+0.01, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
 		#self.ax[1].axvspan(zml-0.01, zml+0.01, color = 'cyan', label = 'zml = '+str(round(zml,2))+', $\chi^2 = $'+str(zml_chisq), alpha = 0.2, zorder = 3)
@@ -911,10 +911,10 @@ class PlotGUI:
 		self.ax[1].set_ylabel(r'$\chi^2$')
 
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
-			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = r'z$_{\mathrm{alt}}$ = '+str(z_a_value)+r', $\chi^2 = $'+str(chisq_value), zorder = 20)
 
 		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
 
@@ -1334,7 +1334,7 @@ if __name__ == '__main__':
 		else:
 			args_template_param = ancillary_file_folder+'/templates/'+args_template_param
 
-	# The tempfilt filen is not necessary for running the program, but this allows
+	# The tempfilt filename is not necessary for running the program, but this allows
 	# it to be either in the ancillary file folder, or you can point somewhere else.
 	if (os.path.isfile(args_tempfilt_filename) == False):
 		if (os.path.isfile(ancillary_file_folder+'/'+args_tempfilt_filename) == True):
@@ -1362,7 +1362,6 @@ if __name__ == '__main__':
 	
 	# The EAZY input file for running the fits		
 	EAZY_output_filename = 'EAZY_input_JADESView.dat'
-
 
 	all_filters_file_name = ancillary_file_folder+'/JADES_All_Filters_EAZYpy.dat'
 	filters_all = np.loadtxt(all_filters_file_name, dtype='str')
