@@ -3,6 +3,6 @@ dependencies:
   - python
   - numpy
   - scipy
-  - astropy
+  - astropy==7.0.2
   - matplotlib
   - h5py
