@@ -572,7 +572,7 @@ class PlotGUI:
 			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = '$z_a$ = '+str(round(z_a_value,2)))
 		else:
 			self.ax[0].plot(bf_output_wavelength/1e4, bf_output_flux, color = 'grey', lw = line_thickness, zorder = 0, label = '$z_a$ = '+str(round(bf_z_a_value,2)), alpha = 0.5)
-			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = '$z_{\mathrm{alt}}$ = '+str(round(z_a_value,2)))
+			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = r'$z_{\mathrm{alt}}$ = '+str(round(z_a_value,2)))
 		self.ax[0].scatter(output_phot_wavelength/1e4, output_phot_template, marker = 's', s = model_square_size, edgecolor = template_color, color = 'None', zorder = 5)
 		
 		# And now let's plot the photometry, along with the flux uncertainties, and the filter widths. 
@@ -582,7 +582,7 @@ class PlotGUI:
 		# Currently, let's look at flux on a logarithmic axis, in the future I'll make
 		# this something you can toggle.	
 		self.ax[0].semilogy()
-		self.ax[0].set_xlabel('Observed Wavelength ($\mu$m)')
+		self.ax[0].set_xlabel(r'Observed Wavelength ($\mu$m)')
 		self.ax[0].set_ylabel('Flux (nJy)')
 		
 		# Make sure that we specify that the SED fit is from EAZY-py.
