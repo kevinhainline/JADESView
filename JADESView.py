@@ -31,6 +31,9 @@ import h5py
 import eazy 
 import eazy.hdf5 
 
+from eazy import photoz
+photoz.MULTIPROCESSING_TIMEOUT = 36000   # 10 hours
+
 import webbrowser
 
 from multiprocessing import Pool
