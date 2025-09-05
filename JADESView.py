@@ -251,6 +251,30 @@ def save_all_eazy_sed(object_ID):
 	np.savetxt(output_chisq_file, np.c_[tempfilt_zgrid, chi2fit], fmt = '%f %f', header="Redshift chisq")	
 	print("Saving EAZY chisq as "+output_chisq_file)
 
+# Saving the individual thumbnails as fits files for each filter shown. 
+def save_all_thumbnails(object_ID, thumbnail_size):
+	print("Saving thumbnail for source: "+str(object_ID))
+
+	# Getting the RA/DEC
+	object_ID_index = np.where(ID_values == object_ID)[0][0]
+	objRA = RA_values[object_ID_index]
+	objDEC = DEC_values[object_ID_index]
+	output_name_stub = str(object_ID)+'_size_'+str(round(float(thumbnail_size),1))+'_arcsec'
+
+	# Creating the output folder, if one doesn't exist 
+	output_folder = str(object_ID)+"_Thumbnails"
+	if (os.path.exists(output_folder) == False):
+		os.mkdir(output_folder)
+			
+	for q in range(0, number_images):
+		image_cutout = return_image_cutout(objRA, objDEC, image_hdu_all[q], image_wcs_all[q], float(thumbnail_size))
+
+		hdu_cutout = copy.copy(image_hdu_all[q])
+		
+		hdu_cutout.data = image_cutout.data
+		hdu_cutout.header.update(image_cutout.wcs.to_header())
+		hdu_cutout.writeto(output_folder+'/'+output_name_stub+'_'+str(all_images_filter_name[q])+'.fits', overwrite = True)
+
 
 # Here's the Plot GUI information
 class PlotGUI:
@@ -438,6 +462,10 @@ class PlotGUI:
 		p_of_z_button = tk.Button(controls, text="P(z)", command=self.p_of_z_plot)
 		p_of_z_button.pack(side=tk.RIGHT)
 
+  		# A button to change the chisq plot to P(z) instead. 
+		sqrt_delta_chisq_button = tk.Button(controls, text=r"√(Δχ²)", command=self.sqrt_chisq_plot)
+		sqrt_delta_chisq_button.pack(side=tk.RIGHT)
+
 		if (args_plot_thumbnails):
 			# Enter an updated chisq ymax value
 			self.thumbnail_size = tk.Entry(controls, width=3)
@@ -504,7 +532,7 @@ class PlotGUI:
 			else:
 				current_thumbnail_size = float(self.thumbnail_size.get())
 
-				if (current_thumbnail_size <=0):
+				if (current_thumbnail_size <= 0):
 					print("NOTE: Thumbnail size must be above 0. Resetting to 2 arcseconds.")
 					self.thumbnail_size.delete(0, tk.END)
 					self.thumbnail_size.insert(0,"2") 
@@ -575,7 +603,7 @@ class PlotGUI:
 			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = '$z_a$ = '+str(round(z_a_value,2)))
 		else:
 			self.ax[0].plot(bf_output_wavelength/1e4, bf_output_flux, color = 'grey', lw = line_thickness, zorder = 0, label = '$z_a$ = '+str(round(bf_z_a_value,2)), alpha = 0.5)
-			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = r'$z_{\mathrm{alt}}$ = '+str(round(z_a_value,2)))
+			self.ax[0].plot(output_wavelength/1e4, output_flux, color = template_color, lw = line_thickness, zorder = 0, label = '$z_{\mathrm{alt}}$ = '+str(round(z_a_value,2)))
 		self.ax[0].scatter(output_phot_wavelength/1e4, output_phot_template, marker = 's', s = model_square_size, edgecolor = template_color, color = 'None', zorder = 5)
 		
 		# And now let's plot the photometry, along with the flux uncertainties, and the filter widths. 
@@ -585,7 +613,7 @@ class PlotGUI:
 		# Currently, let's look at flux on a logarithmic axis, in the future I'll make
 		# this something you can toggle.	
 		self.ax[0].semilogy()
-		self.ax[0].set_xlabel(r'Observed Wavelength ($\mu$m)')
+		self.ax[0].set_xlabel('Observed Wavelength ($\mu$m)')
 		self.ax[0].set_ylabel('Flux (nJy)')
 		
 		# Make sure that we specify that the SED fit is from EAZY-py.
@@ -636,7 +664,7 @@ class PlotGUI:
 				for q in range(0, number_images):
 					filter_image_cutout = return_image_cutout(objRA, objDEC, image_hdu_all[q], image_wcs_all[q], float(self.thumbnail_size.get()))
 					if (filter_image_cutout == -9999):
-						print("Note: No overlap with filter "+str(q))
+						print("Note: No overlap with filter "+str(q)+", "+all_image_paths[q])
 						self.images.append(np.zeros([50,50]))
 					else:
 						self.images.append(filter_image_cutout.data)
@@ -702,10 +730,10 @@ class PlotGUI:
 		self.ax[1].set_xlabel(r'z$_{phot}$')
 		self.ax[1].set_ylabel(r'$\chi^2$')
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
-			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = r'z$_{\mathrm{alt}}$ = '+str(z_a_value)+r', $\chi^2 = $'+str(chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
 	
 		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
 
@@ -759,6 +787,7 @@ class PlotGUI:
 		small_label_fontsize = fig_width * 0.7
 		label_fontsize = fig_width * 0.9
 		title_fontsize = fig_width * 1.0
+		line_thickness = fig_width / 5.
 
 		
 		object_ID = int(self.id_entry.get())
@@ -779,7 +808,7 @@ class PlotGUI:
 		p_of_z = np.exp((-1.0) * (chi2fit - np.min(chi2fit))/2.0)
 		
 		# Now, let's plot the chi-square surface. 
-		self.ax[1].plot(tempfilt_zgrid, p_of_z, color = chisq_surface_color, zorder = 40)
+		self.ax[1].plot(tempfilt_zgrid, p_of_z, color = chisq_surface_color, lw = line_thickness, zorder = 40)
 
 		# Got to get the index within the EAZY object
 		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
@@ -812,10 +841,10 @@ class PlotGUI:
 		self.ax[1].set_ylabel(r'$\chi^2$')
 
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
-			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = r'z$_{\mathrm{alt}}$ = '+str(z_a_value)+r', $\chi^2 = $'+str(chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
 		
 		self.ax[1].axvspan(z500-0.01, z500+0.01, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
 		#self.ax[1].axvspan(zml-0.01, zml+0.01, color = 'cyan', label = 'zml = '+str(round(zml,2))+', $\chi^2 = $'+str(zml_chisq), alpha = 0.2, zorder = 3)
@@ -830,6 +859,122 @@ class PlotGUI:
 		if (self.chisq_ymax_entry.get() != ''):
 			self.ax[1].set_ylim(-10, float(self.chisq_ymax_entry.get()))
 
+		self.fig.tight_layout()
+		self.canvas.draw()
+
+	def sqrt_chisq_plot(self):
+
+		self.ax[1].clear()
+		template_color = '#56B4E9'#'#117733'#'green'
+		NIRC_photometry_color = '#D55E00'#'#882255'#'red'
+		HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
+		chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
+		zspec_color = '#332288'#'orange'
+		alternate_color = 'grey'
+
+		screen_width = self.root.winfo_screenwidth()
+		screen_height = self.root.winfo_screenheight()        
+
+		if (args_gui_width):
+			fig_width = args_gui_width
+			fig_height = args_gui_width / 3.55
+			thumbnail_fig_height = fig_height * 0.8
+		else:
+			dpi = 100  # Approximate dots per inch
+			fig_width = screen_width / dpi * 0.5  
+			fig_height = screen_height / dpi * 0.25  
+			thumbnail_fig_height = screen_height / dpi * 0.2  
+
+		base_fontsize = fig_width * 0.8  # Adjust scaling factor
+		small_label_fontsize = fig_width * 0.7
+		label_fontsize = fig_width * 0.9
+		title_fontsize = fig_width * 1.0
+		line_thickness = fig_width / 5.
+
+		
+		object_ID = int(self.id_entry.get())
+
+		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit, bf_lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		
+		if (self.altz_entry.get() == ''):
+			output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+		else:
+			if ((float(self.altz_entry.get()) > eazy_self.param['Z_MIN']) and (float(self.altz_entry.get()) < eazy_self.param['Z_MAX'])):
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = float(self.altz_entry.get()), alt_z = 0.0)
+			else:
+				self.altz_entry.delete(0, tk.END)
+				self.altz_entry.insert(0,"") 
+				print("NOTE: Alternate redshift must be between "+str(eazy_self.param['Z_MIN'])+" and "+str(eazy_self.param['Z_MAX']))
+				output_wavelength, output_flux, output_phot_wavelength, output_phot_template, output_phot_err_template, output_phot, output_phot_err, z_a_value, tempfilt_zgrid, chi2fit, lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
+
+
+		#p_of_z = np.exp((-1.0) * (chi2fit - np.min(chi2fit))/2.0)
+		chisq_scaled = np.sqrt(chi2fit - np.min(chi2fit))
+
+		chisq_max = float(np.nanmax(chisq_scaled))
+		y_sigma_max = min(max(np.ceil(chisq_max), 6), 16)
+		y_bottom = -0.5
+		
+		# sigma ticks (0, 2, 4, etc)
+		sigma_ticks = np.arange(0, y_sigma_max + 1e-9, 2.0)
+		
+		
+		# Now, let's plot the chi-square surface. 
+		self.ax[1].plot(tempfilt_zgrid, chisq_scaled, color = chisq_surface_color, lw = line_thickness, zorder = 40)
+
+		for s in sigma_ticks:
+			self.ax[1].axhline(s, ls = "--", lw = 0.8, alpha = 0.35, color = 'gray')
+
+		# Got to get the index within the EAZY object
+		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
+
+		# Let's grab the chisq value at the specified redshift. 
+		#bf_chisq_value = get_chisq(bf_tempfilt_zgrid, bf_chi2fit, bf_z_a_value)
+		bf_chisq_value = zout['raw_chi2'][objid_index]
+		chisq_value = get_chisq(tempfilt_zgrid, chi2fit, z_a_value)
+
+		z160 = zout['z160'][objid_index]
+		z840 = zout['z840'][objid_index]
+		
+		z500 = zout['z500'][objid_index]
+
+		upper_error = z840 - z500
+		lower_error = z500 - z160
+
+		z025 = zout['z025'][objid_index]
+		z975 = zout['z975'][objid_index]
+
+		# The "maximum likelihood" redshift from EAZY, derived from fitting a parabola to the lnp surface
+		# see "get_maxlnp_redshift" within EAZY.
+		#zml = zout['z_ml'][objid_index]
+		#zml_chisq = zout['z_ml_chi2'][objid_index]
+		
+		# The raw chisq minimum. 
+		bf_chisq_value = zout['raw_chi2'][objid_index]
+		
+		self.ax[1].set_xlabel(r'z$_{phot}$')
+		self.ax[1].set_ylabel(r"$\sqrt{\chi^2 - \chi^2_{\min}}\;[\sigma]$")
+
+		if (self.altz_entry.get() == ''):
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
+		else:
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
+		
+		self.ax[1].axvspan(z500-0.01, z500+0.01, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
+		#self.ax[1].axvspan(zml-0.01, zml+0.01, color = 'cyan', label = 'zml = '+str(round(zml,2))+', $\chi^2 = $'+str(zml_chisq), alpha = 0.2, zorder = 3)
+
+		#self.ax[1].set_xlim(z160-2,z840+2)
+		self.ax[1].axvspan(z025, z975, color = 'grey', zorder = 0, alpha = 0.2)
+		self.ax[1].axvspan(z160, z840, color = 'grey', zorder = 1, alpha = 0.5)
+
+		pz_legend = self.ax[1].legend(loc = 4, fontsize = label_fontsize, frameon=False)
+		pz_legend.set_zorder(50)
+
+#		if (self.chisq_ymax_entry.get() != ''):
+#			self.ax[1].set_ylim(-10, float(self.chisq_ymax_entry.get()))
+
+		self.ax[1].set_ylim(y_bottom, y_sigma_max)
 		self.fig.tight_layout()
 		self.canvas.draw()
 		
@@ -886,7 +1031,7 @@ class PlotGUI:
 		self.ymax_entry.delete(0, tk.END)  # Delete current text
 
 		# Now, let's plot the chi-square surface. 
-		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
+		#self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
 
 		# Got to get the index within the EAZY object
 		objid_index = np.where(eazy_self.OBJID == int(self.current_ID))[0][0]
@@ -909,15 +1054,15 @@ class PlotGUI:
 		z975 = zout['z975'][objid_index]
 		
 		self.ax[1].clear()
-		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, zorder = 40)
+		self.ax[1].plot(tempfilt_zgrid, chi2fit, color = chisq_surface_color, lw = line_thickness, zorder = 40)
 		self.ax[1].set_xlabel(r'z$_{phot}$')
 		self.ax[1].set_ylabel(r'$\chi^2$')
 
 		if (self.altz_entry.get() == ''):
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
 		else:
-			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+r', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
-			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = r'z$_{\mathrm{alt}}$ = '+str(z_a_value)+r', $\chi^2 = $'+str(chisq_value), zorder = 20)
+			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = 'grey', label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 19)
+			self.ax[1].axvspan(z_a_value-0.05, z_a_value+0.05, color = template_color, label = 'z$_{\mathrm{alt}}$ = '+str(z_a_value)+', $\chi^2 = $'+str(chisq_value), zorder = 20)
 
 		self.ax[1].axvspan(z500-0.05, z500+0.05, color = 'red', label = 'z500 = '+str(round(z500,2))+'$^{+'+str(round(upper_error,2))+'}$'+'$_{-'+str(round(lower_error,2))+'}$', alpha = 0.2, zorder = 3)
 
@@ -1070,10 +1215,12 @@ class PlotGUI:
 		
 	# Saving the individual thumbnails as fits files for each filter shown. 
 	def save_thumbnails(self):
-		print("Saving thumbnails")
 
 		# Getting the RA/DEC
 		object_ID = int(self.id_entry.get())
+
+		print("Object "+str(object_ID)+": Saving thumbnails")
+
 		object_ID_index = np.where(ID_values == object_ID)[0][0]
 		objRA = RA_values[object_ID_index]
 		objDEC = DEC_values[object_ID_index]
@@ -1089,9 +1236,13 @@ class PlotGUI:
 
 			hdu_cutout = copy.copy(image_hdu_all[q])
 			
-			hdu_cutout.data = image_cutout.data
-			hdu_cutout.header.update(image_cutout.wcs.to_header())
-			hdu_cutout.writeto(output_folder+'/'+output_name_stub+'_'+str(all_images_filter_name[q])+'.fits', overwrite = True)
+			try:
+				hdu_cutout.data = image_cutout.data
+				hdu_cutout.header.update(image_cutout.wcs.to_header())
+				hdu_cutout.writeto(output_folder+'/'+output_name_stub+'_'+str(all_images_filter_name[q])+'.fits', overwrite = True)
+			except AttributeError:
+				print("   image_cutout for "+all_images_filter_name[q]+" doesn't have any data")
+
 
 	def open_fitsmap(self):
 		# Getting the RA/DEC
@@ -1118,36 +1269,6 @@ class PlotGUI:
 				clicked_x = event.xdata 
 				# Pass to click handler function
 				self.handle_x_click(clicked_x)  
-
-
-# 	def on_resize(self, event):
-# 		""" Adjusts figure size dynamically when the window resizes. """
-# 		new_width = self.root.winfo_width()
-# 		new_height = self.root.winfo_height()
-# 		
-# 		dpi = 100  # Keep DPI fixed
-# 		fig_width = new_width / dpi * 0.6  # Scale based on new width
-# 		fig_height = new_height / dpi * 0.4  # Scale based on new height
-# 		thumbnail_fig_height = new_height / dpi * 0.2  # 40% of screen height
-# 		
-# 		# Update figure size
-# 		self.fig.set_size_inches(fig_width, fig_height, forward=True)
-# 		
-# 		# Adjust font sizes dynamically
-# 		base_fontsize = fig_width * 1.2
-# 		base_fontsize = fig_width * 0.8  # Adjust scaling factor
-# 		small_label_fontsize = fig_width * 0.5
-# 		label_fontsize = fig_width * 0.6
-# 		title_fontsize = fig_width * 1.0
-# 		plt.rcParams.update({'font.size': base_fontsize})
-# 
-# 		if (args_plot_thumbnails):
-# 			self.image_fig.set_size_inches(fig_width, thumbnail_fig_height)
-# 		
-# 		# Redraw the canvas
-# 		self.canvas.draw()
-
-
 
 	def handle_x_click(self, x_value):
 		# Example action: update a label or print
@@ -1309,6 +1430,13 @@ if __name__ == '__main__':
 				generate_seds = True
 			else:
 				generate_seds = False
+
+		# only generate the EAZY output SED plots at the z_a values.
+		if (input_lines[i,0] == 'generate_thumbnails'):
+			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
+				generate_thumbnails = True
+			else:
+				generate_thumbnails = False
 			
 
 	# CHECKING IF THE FILES EXIST
@@ -1337,7 +1465,7 @@ if __name__ == '__main__':
 		else:
 			args_template_param = ancillary_file_folder+'/templates/'+args_template_param
 
-	# The tempfilt filename is not necessary for running the program, but this allows
+	# The tempfilt filen is not necessary for running the program, but this allows
 	# it to be either in the ancillary file folder, or you can point somewhere else.
 	if (os.path.isfile(args_tempfilt_filename) == False):
 		if (os.path.isfile(ancillary_file_folder+'/'+args_tempfilt_filename) == True):
@@ -1365,6 +1493,7 @@ if __name__ == '__main__':
 	
 	# The EAZY input file for running the fits		
 	EAZY_output_filename = 'EAZY_input_JADESView.dat'
+
 
 	all_filters_file_name = ancillary_file_folder+'/JADES_All_Filters_EAZYpy.dat'
 	filters_all = np.loadtxt(all_filters_file_name, dtype='str')
@@ -1557,6 +1686,13 @@ if __name__ == '__main__':
 		number_objects = len(ID_numbers)
 
 	number_input_objects = len(ID_numbers)	
+
+	# make all of the SEDs for the sources
+	if (generate_thumbnails == True):
+		for p in range(0, number_input_objects):
+			save_all_thumbnails(ID_numbers[p], ra_dec_size_value)
+		sys.exit("Generated Thumbnails for all objects!")
+
 	
 	print('Making EAZY file!')
 	
@@ -1709,7 +1845,7 @@ if __name__ == '__main__':
 					sys.exit("EXITING: The tempfilt file "+args_tempfilt_filename+" cannot be used in this EAZY configuration")
 
 	if (os.path.isfile(args_zeropoint_filename) == True):
-		print("Using zphot.zeropoint file!")
+		print("Using zphot.zeropoint file: "+args_zeropoint_filename)
 		params['GET_ZP_OFFSETS'] = True                # Look for zphot.zeropoint file and compute zeropoint offsets
 		zeropoint_file = args_zeropoint_filename	
 		translate_file = 'zphot.translate' 
