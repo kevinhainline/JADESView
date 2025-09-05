@@ -206,6 +206,8 @@ templates                JADES_fsps.param
 tempfilt                 JADES_GS_v100_tempfilt.pkl 
 image_list               JADES_v100_mosaic_files.dat
 plot_thumbnails          False
+generate_seds            False
+generate_thumbnails      False
 ra_dec_size_value        2.0
 asada_cgm                False
 fix_zspec                False
