@@ -42,19 +42,20 @@ input_photometry         /Path/to/photometric/catalog
 convolved                False
 aperture                 CIRC1
 uncertainty              _e
+ancillary_files          JADESView_files
 filters                  JADES_filters_no_WFC3_v1.0.0.dat
 min_rel_err              0.05
 eazy_ncores              8
-ancillary_files          JADESView_files
 zeropoint                zphot.zeropoint
 templates                JADES_fsps.param
 tempfilt                 JADES_GS_v100_tempfilt.pkl 
 image_list               JADES_v100_mosaic_files.dat
 plot_thumbnails          True
+generate_seds            False
+generate_thumbnails      False
 ra_dec_size_value        2.0
-asada_cgm                False
-fix_zspec                False
-fitsmap_link             https://jades.idies.jhu.edu/?ra=RA_VALUE&dec=DEC_VALUE&zoom=10
+gui_width                15
+fitsmap_link             https://jades.idies.jhu.edu/?ra=RA_VALUE&dec=DEC_VALUE&zoom=9
 ```
 
 In this file, do not modify the first column, but replace the values in the second column
@@ -107,6 +108,9 @@ you change any of these parameters, and try to use a tempfilt file that does not
 the code will exit with an error message. The length of time it takes to create the
 tempfilt array depends on the number of templates, filters, and redshift grid parameters.
 
+If you set `generate_seds` to True, it will skip the creation of the GUI, and instead just
+print out the EAZY SEDs and chisq text files to the current directory. 
+
 You can also plot thumbnails underneath the SED and chi-square surface, by
 setting `plot_thumbnails` to `True`. If you do, you should point to the various 
 mosaic values with the `image_list`. The code looks for three columns:
@@ -126,8 +130,11 @@ NRC_F444W 1 /Path/to/Mosaic/File/F444W.fits
 The first column is the name of the filter (the names that are supported are in column 1
 of `JADESView_files/JADES_All_Filters_EAZYpy.dat`. The second column is the hdu of the
 data, and the third column is the path. The default size of the thumbnails, in arcseconds,
-is given by `ra_dec_size_value.` The thumbnail size can be changed within the program on 
+is given by `ra_dec_size_value`. The thumbnail size can be changed within the program on 
 the fly. 
+
+If you set `generate_thumbnails` to true, it will skip running EAZY, and will instead 
+generate the thumbnails at the ID list positions, with the size given by `ra_dec_size_value`.
 
 The program is run by specifying the `JADESView_input_file.dat` and an ID, an ID list
  (as a text file), or an ID list on the command line:

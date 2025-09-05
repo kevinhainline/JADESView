@@ -6,13 +6,12 @@ ancillary_files          JADESView_files
 filters                  JADES_filters_no_WFC3_v1.0.0.dat
 min_rel_err              0.05
 eazy_ncores              8
-snr_filter               F200W
 zeropoint                zphot.zeropoint
 templates                JADES_fsps.param
 tempfilt                 JADES_GS_v100_tempfilt.pkl 
 image_list               JADES_v100_mosaic_files.dat
 plot_thumbnails          True
-generate_seds            True
+generate_seds            False
 generate_thumbnails      False
 ra_dec_size_value        2.0
 gui_width                15
