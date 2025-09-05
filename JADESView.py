@@ -1424,19 +1424,17 @@ if __name__ == '__main__':
 			fitsmap_link = input_lines[i,1]
 			fitsmap_link_exists = True
 
+		generate_seds = False
 		# only generate the EAZY output SED plots at the z_a values.
 		if (input_lines[i,0] == 'generate_seds'):
 			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
 				generate_seds = True
-			else:
-				generate_seds = False
-
+		
+		generate_thumbnails = False
 		# only generate the EAZY output SED plots at the z_a values.
 		if (input_lines[i,0] == 'generate_thumbnails'):
 			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
 				generate_thumbnails = True
-			else:
-				generate_thumbnails = False
 			
 
 	# CHECKING IF THE FILES EXIST
