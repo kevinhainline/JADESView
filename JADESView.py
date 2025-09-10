@@ -290,8 +290,9 @@ class PlotGUI:
 		screen_height = self.root.winfo_screenheight()        
 
 		if (args_gui_width):
+			print("Setting the GUI width to user specified: "+str(args_gui_width))
 			fig_width = args_gui_width
-			fig_height = args_gui_width / 3.55
+			fig_height = args_gui_width / width_to_height_ratio
 			thumbnail_fig_height = fig_height * 0.8
 		else:
 			dpi = 100  # Approximate dots per inch
@@ -496,7 +497,7 @@ class PlotGUI:
 
 		if (args_gui_width):
 			fig_width = args_gui_width
-			fig_height = args_gui_width / 3.55
+			fig_height = args_gui_width / width_to_height_ratio
 			thumbnail_fig_height = fig_height * 0.8
 		else:
 			dpi = 100  # Approximate dots per inch
@@ -532,7 +533,7 @@ class PlotGUI:
 			else:
 				current_thumbnail_size = float(self.thumbnail_size.get())
 
-				if (current_thumbnail_size <= 0):
+				if (current_thumbnail_size <=0):
 					print("NOTE: Thumbnail size must be above 0. Resetting to 2 arcseconds.")
 					self.thumbnail_size.delete(0, tk.END)
 					self.thumbnail_size.insert(0,"2") 
@@ -775,7 +776,7 @@ class PlotGUI:
 
 		if (args_gui_width):
 			fig_width = args_gui_width
-			fig_height = args_gui_width / 3.55
+			fig_height = args_gui_width / width_to_height_ratio
 			thumbnail_fig_height = fig_height * 0.8
 		else:
 			dpi = 100  # Approximate dots per inch
@@ -877,7 +878,7 @@ class PlotGUI:
 
 		if (args_gui_width):
 			fig_width = args_gui_width
-			fig_height = args_gui_width / 3.55
+			fig_height = args_gui_width / width_to_height_ratio
 			thumbnail_fig_height = fig_height * 0.8
 		else:
 			dpi = 100  # Approximate dots per inch
@@ -988,7 +989,7 @@ class PlotGUI:
 
 		if (args_gui_width):
 			fig_width = args_gui_width
-			fig_height = args_gui_width / 3.55
+			fig_height = args_gui_width / width_to_height_ratio
 			thumbnail_fig_height = fig_height * 0.8
 		else:
 			dpi = 100  # Approximate dots per inch
@@ -1270,6 +1271,7 @@ class PlotGUI:
 				# Pass to click handler function
 				self.handle_x_click(clicked_x)  
 
+
 	def handle_x_click(self, x_value):
 		# Example action: update a label or print
 		self.altz_entry.delete(0, tk.END)
@@ -1340,10 +1342,14 @@ args=parser.parse_args()
 
 if __name__ == '__main__':
 
+	width_to_height_ratio = 2.9
+
 	# Read in the various input values from the input file. 
 	input_lines = np.loadtxt(args.JADESView_input_file, dtype='str')
 	number_input_lines = len(input_lines[:,0])
 	generate_seds = False
+	args_gui_width = False
+	generate_thumbnails = False
 	for i in range(0, number_input_lines):
 
 		# ANCILLARY FILE FOLDER
@@ -1414,23 +1420,20 @@ if __name__ == '__main__':
 			ra_dec_size_value = float(input_lines[i,1])
 
 		# the width of the GUI, for smaller monitors
-		args_gui_width = False
 		if (input_lines[i,0] == 'gui_width'):
 			if (float(input_lines[i,1]) > 0):
 				args_gui_width = float(input_lines[i,1])
-
+		
 		# the raw fitsmap link
 		if (input_lines[i,0] == 'fitsmap_link'):
 			fitsmap_link = input_lines[i,1]
 			fitsmap_link_exists = True
 
-		generate_seds = False
 		# only generate the EAZY output SED plots at the z_a values.
 		if (input_lines[i,0] == 'generate_seds'):
 			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
 				generate_seds = True
-		
-		generate_thumbnails = False
+
 		# only generate the EAZY output SED plots at the z_a values.
 		if (input_lines[i,0] == 'generate_thumbnails'):
 			if ((input_lines[i,1] == 'True') or (input_lines[i,1] == 'T') or (input_lines[i,1] == 'Yes') or (input_lines[i,1] == 'Y')):
@@ -1619,8 +1622,11 @@ if __name__ == '__main__':
 	
 		subsample_id_index = np.zeros(number_subsample_objects, dtype = 'int')
 		for j in range(0, number_subsample_objects):
-			#print(subsample_ID_numbers[j])
-			subsample_id_index[j] = np.where(ID_values == subsample_ID_numbers[j])[0][0]
+			find_index = np.where(ID_values == subsample_ID_numbers[j])[0]
+			if (len(find_index) > 0):
+				subsample_id_index[j] = np.where(ID_values == subsample_ID_numbers[j])[0][0]
+			else:
+				sys.exit("Exiting: Object "+str(subsample_ID_numbers[j])+" not found in catalog")
 		
 		ID_numbers = ID_values[subsample_id_index]
 		#ID_values = ID_values[subsample_id_index]
@@ -1637,7 +1643,12 @@ if __name__ == '__main__':
 		if (args.id_number_list):
 			"You can't specify an individual ID and a list, ignoring the list."
 	
-		subsample_id_index = np.where(ID_values == int(args.id_number))[0][0]
+		find_index = np.where(ID_values == int(args.id_number))[0]
+		if (len(find_index) > 0):
+			subsample_id_index = np.where(ID_values == int(args.id_number))[0][0]
+		else:
+			sys.exit("Exiting: Object "+str(int(args.id_number))+" not found in catalog")
+
 		redshifts = np.array([redshifts[subsample_id_index]])
 		fluxes_all = fluxes_all[subsample_id_index,:]
 		errors_all = errors_all[subsample_id_index,:]
@@ -1650,11 +1661,11 @@ if __name__ == '__main__':
 
 		subsample_id_index = np.zeros(number_input_objects, dtype = 'int')
 		for j in range(0, number_input_objects):
-			test_subsample_id_index = np.where(ID_values == ID_numbers[j])[0]
-			if (len(test_subsample_id_index) > 0):
-				subsample_id_index[j] = test_subsample_id_index[0]
+			find_index = np.where(ID_values == ID_numbers[j])[0]
+			if (len(find_index) > 0):
+				subsample_id_index[j] = find_index[0]
 			else:
-				sys.exit("Exiting: ID "+str(ID_numbers[j])+" not found!")
+				sys.exit("Exiting: find_index "+str(ID_numbers[j])+" in catalog")
 				
 		#ID_values = ID_values[subsample_id_index]
 		redshifts = redshifts[subsample_id_index]
