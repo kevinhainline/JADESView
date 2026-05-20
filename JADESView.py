@@ -52,6 +52,7 @@ NIRC_photometry_color = '#D55E00'#'#882255'#'red'
 HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
 chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
 zspec_color = '#332288'#'orange'
+alternate_color = 'grey'
 
 output_plot_folder = ''
 
@@ -130,6 +131,7 @@ def RawCatalog_To_Fluxes_Errs_RA_DEC(raw_catalog_file, short_filter_list, blende
 			raw_flux[:,q] = -9999
 			raw_flux_errors[:,q] = -9999
 
+	raw_catalog.close()
 	return raw_ID.astype('int'), raw_flux, raw_flux_errors, raw_RA_phot, raw_DEC_phot
 
 # For an entry redshift, tempfilt, and chi2grid, this returns the closest chisq value. 
@@ -161,7 +163,6 @@ def return_image_cutout(objRA, objDEC, image_hdu, image_wcs, thumbnail_size):
 
 	rasize_value = thumbnail_size#2.0
 	decsize_value = thumbnail_size#2.0
-	cosdec_center = math.cos(objDEC * 3.141593 / 180.0)
 
 	# Set the position of the object
 	position = SkyCoord(str(objRA)+'d '+str(objDEC)+'d', frame='fk5')
@@ -268,6 +269,8 @@ def save_all_thumbnails(object_ID, thumbnail_size):
 			
 	for q in range(0, number_images):
 		image_cutout = return_image_cutout(objRA, objDEC, image_hdu_all[q], image_wcs_all[q], float(thumbnail_size))
+		
+		if image_cutout == -9999: continue
 
 		hdu_cutout = copy.copy(image_hdu_all[q])
 		
@@ -570,14 +573,6 @@ class PlotGUI:
 		# Get the JADES RA/DEC ID value	
 		JADES_ID = RADEC_to_RADECName(objRA, objDEC, namestub) 
 		
-		# Here are the colors that are used in the plotting.
-		template_color = '#56B4E9'#'#117733'#'green'
-		NIRC_photometry_color = '#D55E00'#'#882255'#'red'
-		HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
-		chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
-		zspec_color = '#332288'#'orange'
-		alternate_color = 'grey'
-
 		# This is the best fit values from EAZY, which we'll always want to keep
 		# on the plot.
 		bf_output_wavelength, bf_output_flux, bf_output_phot_wavelength, bf_output_phot_template, bf_output_phot_err_template, bf_output_phot, bf_output_phot_err, bf_z_a_value, bf_tempfilt_zgrid, bf_chi2fit, bf_lnp = return_eazy_output(object_ID, eazy_self, zout, primary_z = -9999, alt_z = 0.0)
@@ -670,35 +665,35 @@ class PlotGUI:
 					else:
 						self.images.append(filter_image_cutout.data)
 
-					image_iterator = np.arange(0, number_images, 1)
-					for j, ax, img in zip(image_iterator, self.image_axes.flatten(), self.images):
-		
-						ax.clear()
-						indexerror = 0
-						try:
-							norm = ImageNormalize(img, interval=ZScaleInterval(), stretch=LinearStretch())
-						except IndexError:
-							indexerror = 1
-						except UnboundLocalError:
-							indexerror = 1
-										
-						if (indexerror == 0):
-							ax.imshow(img, cmap='gray', origin = 'lower', aspect='equal', norm = norm)
-						else:
-							ax.imshow(img, cmap='gray', origin = 'lower', aspect = 'equal')
-		
-						ax.text(0.51, 0.96, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', ha='center', va='top', color = 'black')
-						ax.text(0.5, 0.95, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', ha='center', va='top', color = 'white')
-		
-						if ((round(SNR_values[object_ID_index,j],2) > -100) and (round(SNR_values[object_ID_index,j],2) < 100)):
-							ax.text(0.5, 0.06, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', horizontalalignment='center', color = 'black')
-							ax.text(0.5, 0.05, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', horizontalalignment='center', color = 'white')
-						elif(round(SNR_values[object_ID_index,j],2) > 100):
-							ax.text(0.5, 0.06, 'SNR > 100', transform=ax.transAxes, fontsize=small_label_fontsize, fontweight='bold', horizontalalignment='center', color = 'black')
-							ax.text(0.5, 0.05, 'SNR > 100', transform=ax.transAxes, fontsize=small_label_fontsize, fontweight='bold', horizontalalignment='center', color = 'white')
-		
-						ax.axis('off')
-					self.image_canvas.draw()
+				image_iterator = np.arange(0, number_images, 1)
+				for j, ax, img in zip(image_iterator, self.image_axes.flatten(), self.images):
+	
+					ax.clear()
+					indexerror = 0
+					try:
+						norm = ImageNormalize(img, interval=ZScaleInterval(), stretch=LinearStretch())
+					except IndexError:
+						indexerror = 1
+					except UnboundLocalError:
+						indexerror = 1
+									
+					if (indexerror == 0):
+						ax.imshow(img, cmap='gray', origin = 'lower', aspect='equal', norm = norm)
+					else:
+						ax.imshow(img, cmap='gray', origin = 'lower', aspect = 'equal')
+	
+					ax.text(0.51, 0.96, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', ha='center', va='top', color = 'black')
+					ax.text(0.5, 0.95, all_images_filter_name[j].split('_')[1], transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', ha='center', va='top', color = 'white')
+	
+					if ((round(SNR_values[object_ID_index,j],2) > -100) and (round(SNR_values[object_ID_index,j],2) < 100)):
+						ax.text(0.5, 0.06, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', horizontalalignment='center', color = 'black')
+						ax.text(0.5, 0.05, 'SNR = '+str(round(SNR_values[object_ID_index,j],2)), transform=ax.transAxes, fontsize=label_fontsize, fontweight='bold', horizontalalignment='center', color = 'white')
+					elif(round(SNR_values[object_ID_index,j],2) > 100):
+						ax.text(0.5, 0.06, 'SNR > 100', transform=ax.transAxes, fontsize=small_label_fontsize, fontweight='bold', horizontalalignment='center', color = 'black')
+						ax.text(0.5, 0.05, 'SNR > 100', transform=ax.transAxes, fontsize=small_label_fontsize, fontweight='bold', horizontalalignment='center', color = 'white')
+	
+					ax.axis('off')
+				self.image_canvas.draw()
 
 		# Here's the current ID. 
 		self.current_ID = object_ID
@@ -764,12 +759,6 @@ class PlotGUI:
 	def p_of_z_plot(self):
 
 		self.ax[1].clear()
-		template_color = '#56B4E9'#'#117733'#'green'
-		NIRC_photometry_color = '#D55E00'#'#882255'#'red'
-		HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
-		chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
-		zspec_color = '#332288'#'orange'
-		alternate_color = 'grey'
 
 		screen_width = self.root.winfo_screenwidth()
 		screen_height = self.root.winfo_screenheight()        
@@ -839,7 +828,7 @@ class PlotGUI:
 		bf_chisq_value = zout['raw_chi2'][objid_index]
 		
 		self.ax[1].set_xlabel(r'z$_{phot}$')
-		self.ax[1].set_ylabel(r'$\chi^2$')
+		self.ax[1].set_ylabel(r'P(z)')
 
 		if (self.altz_entry.get() == ''):
 			self.ax[1].axvspan(bf_z_a_value-0.05, bf_z_a_value+0.05, color = template_color, label = 'z = '+str(bf_z_a_value)+', $\chi^2 = $'+str(round(bf_chisq_value,3)), zorder = 20)
@@ -866,12 +855,6 @@ class PlotGUI:
 	def sqrt_chisq_plot(self):
 
 		self.ax[1].clear()
-		template_color = '#56B4E9'#'#117733'#'green'
-		NIRC_photometry_color = '#D55E00'#'#882255'#'red'
-		HST_photometry_color =  '#F786AA'#'#CC6677'#'lightcoral'
-		chisq_surface_color = '#E69F00'#'#88CCEE'#'blue'
-		zspec_color = '#332288'#'orange'
-		alternate_color = 'grey'
 
 		screen_width = self.root.winfo_screenwidth()
 		screen_height = self.root.winfo_screenheight()        
@@ -1088,15 +1071,6 @@ class PlotGUI:
 		self.fig.tight_layout()
 		self.canvas.draw()
     
-	def load_images(self):
-		self.images = [np.random.rand(50, 50) for _ in range(10)]
-		for ax, img in zip(self.image_axes.flatten(), self.images):
-			ax.clear()
-			ax.imshow(img, cmap='gray')
-			ax.axis('off')
-		self.fig.tight_layout()
-		self.image_canvas.draw()
-
 	def save_eazy_sed(self):
 		object_ID = int(self.id_entry.get())
 
@@ -1201,7 +1175,7 @@ class PlotGUI:
 		object_iterator = np.where(ID_numbers == int(self.id_entry.get()))[0][0]
 		try:
 			#print(object_iterator)
-			if (object_iterator < number_objects):
+			if (object_iterator < number_objects - 1):
 				object_iterator = object_iterator + 1
 				self.id_entry.delete(0, tk.END)  # Delete current text
 				self.id_entry.insert(0,str(ID_numbers[object_iterator])) 
@@ -1555,7 +1529,6 @@ if __name__ == '__main__':
 		number_image_filters = len(all_images_filter_name)
 		number_images = len(all_image_paths)
 		
-		image_all = np.empty(0)
 		image_hdu_all = np.empty(0)
 		image_wcs_all = np.empty(0)
 	
@@ -1568,12 +1541,11 @@ if __name__ == '__main__':
 			print("Opening up image: "+all_image_paths[i])
 			if (all_image_paths[i] == 'NoImage'):
 				all_image_paths[i] = 'NoImage.fits'
-			image_all = np.append(image_all, fits.open(all_image_paths[i]))
 			try:
-				image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i])[all_image_extension_number[i]])
+				image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i], memmap = True)[all_image_extension_number[i]])
 			except IndexError:
 				print('IndexError')
-				image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i]))
+				image_hdu_all = np.append(image_hdu_all, fits.open(all_image_paths[i], memmap = True))
 				print('Running fits.open('+str(all_image_paths[i])+')')
 	
 			image_wcs_all = np.append(image_wcs_all, WCS(image_hdu_all[i].header))
@@ -1590,11 +1562,11 @@ if __name__ == '__main__':
 	
 	if (args_min_rel_err):
 		print("Setting minimum relative error.")
-		for n in range(0, number_filters):
-			for j in range(0, number_objects):
-				if ((errors_all[j,n] > 0) & (fluxes_all[j,n] > 0)):
-					if ((errors_all[j,n] / fluxes_all[j,n]) < args_min_rel_err):
-						errors_all[j,n] = args_min_rel_err * fluxes_all[j,n]
+		pos = (errors_all > 0) & (fluxes_all > 0)
+		ratio = np.where(pos, errors_all / fluxes_all, np.inf)
+		errors_all = np.where(pos & (ratio < args_min_rel_err),
+							  args_min_rel_err * fluxes_all,
+							  errors_all)
 
 	if (args_plot_thumbnails):
 		print("Getting SNR values for the image photometry.")
