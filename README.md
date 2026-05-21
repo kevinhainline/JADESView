@@ -18,6 +18,7 @@ options:
   -idarglist IDARGLIST  Command line argument list of objects
 ```
 
+[I've written a full Users Guide to JADESView Here](https://kevinhainline.github.io/jadesview_guide/)
 
 This tool was designed to allow users to look at EAZY fits alongside
 thumbnails for for objects from JADES photometric catalogs. The user should download
@@ -142,7 +143,7 @@ The program is run by specifying the `JADESView_input_file.dat` and an ID, an ID
 ```
 python JADESView.py -jv_params JADESView_input_file.dat -id 1234
 python JADESView.py -jv_params JADESView_input_file.dat -idlist list-of-IDs.dat
-python JADESView.py -jv_params JADESView_input_file.dat -idarglist '5 6 7 8 9 10' 
+python JADESView.py -jv_params JADESView_input_file.dat -idarglist '5, 6, 7, 8, 9, 10' 
 ```
 
 Within the program, the user can look at the EAZY SED fit, chi-square surface,
@@ -167,11 +168,12 @@ the object, given a fitsmap link provided in `JADESView_input_file.dat`. Notice 
 example:
 
 ```
-fitsmap_link             https://jades.idies.jhu.edu/?ra=RA_VALUE&dec=DEC_VALUE&zoom=10
+fitsmap_link             https://jades.idies.jhu.edu/goods-s/?ra=RA_VALUE&dec=DEC_VALUE&zoom=10
 ```
 
 The words `RA_VALUE` and `DEC_VALUE`. These are what the code is looking for, and so
-if the fitsmap button isn't working, check your file. 
+if the fitsmap button isn't working, check your file. For GOODS-N, you'll want to change
+the url to say `goods-n` instead. 
 
 The next button, `Save Thumbnails`, allow the user to create an output set of thumbnails as fits file 
 cutouts in a folder labelled after the ID for the object. Similarly, `Save EAZY SED + Chisq`, 
@@ -211,7 +213,7 @@ generate_thumbnails      False
 ra_dec_size_value        2.0
 asada_cgm                False
 fix_zspec                False
-fitsmap_link             https://jades.idies.jhu.edu/?ra=RA_VALUE&dec=DEC_VALUE&zoom=9
+fitsmap_link             https://jades.idies.jhu.edu/goods-s/?ra=RA_VALUE&dec=DEC_VALUE&zoom=10
 ```
 
 And now you can run:
@@ -226,8 +228,7 @@ those will be plotted beneath.
 
 ## Installation
 
-While JADESView works under python3, you will need to use matplotlib v2.2.5. I recommend creating
-a conda environment using the attached `environment.yml` file:
+To install JADESView, I recommend creating a conda or mamba environment using the attached `environment.yml` file:
 
 ```
 % conda env create -f environment.yml
